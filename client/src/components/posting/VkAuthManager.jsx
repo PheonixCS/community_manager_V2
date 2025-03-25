@@ -66,18 +66,29 @@ const VkAuthManager = () => {
     }
   };
 
-  // Update the fetchAuthUrl function to handle errors better
-  const fetchAuthUrl = async () => {
-    try {
-      const response = await axios.get('/api/vk-auth/auth-url');
-      setAuthUrl(response.data.authUrl);
-      console.log('Fetched VK auth URL for button activation');
-      return response.data.authUrl; // Return the URL for immediate use if needed
-    } catch (error) {
-      console.error('Error fetching auth URL:', error);
-      // We don't show the snackbar here anymore to avoid confusion on initial load
-      throw error; // Rethrow so caller can handle if needed
+  // Helper function to correctly parse the scope from any format
+  const parseScopes = (scope) => {
+    if (!scope) return [];
+    
+    // Handle array that contains a string with space-separated permissions in the first element
+    if (Array.isArray(scope)) {
+      return scope.flatMap(item => typeof item === 'string' ? item.split(' ') : item);
     }
+    
+    // Handle string with space-separated permissions
+    if (typeof scope === 'string') {
+      return scope.split(' ');
+    }
+    
+    return [];
+  };
+
+  // Modify the fetchAuthUrl function to be simpler since we generate the URL on the frontend
+  const fetchAuthUrl = async () => {
+    // We no longer need to fetch the URL from the backend during initialization
+    // Just return a success - we'll generate the URL when needed in handleAuthButtonClick
+    console.log('Auth URL will be generated when needed');
+    return true;
   };
 
   const handleDeleteToken = async () => {
@@ -199,17 +210,29 @@ const VkAuthManager = () => {
         codeChallenge: codeChallenge.substring(0, 10) + '...'
       });
       
-      // Get the VK ID auth URL with our PKCE parameters
-      const response = await axios.get('/api/vk-auth/auth-url', {
-        params: {
-          state,
-          codeChallenge,
-          codeChallengeMethod: 'S256'
-        }
-      });
+      // Generate the auth URL on the client side or get it from the backend
+      // depending on your application's needs
+      let authUrl;
       
-      const authUrl = response.data.authUrl;
-      console.log('Fetched VK auth URL with PKCE parameters:', authUrl);
+      try {
+        // Get the VK ID auth URL with our PKCE parameters
+        const response = await axios.get('/api/vk-auth/auth-url', {
+          params: {
+            state,
+            codeChallenge,
+            codeChallengeMethod: 'S256'
+          }
+        });
+        
+        authUrl = response.data.authUrl;
+      } catch (error) {
+        console.error('Error fetching auth URL from backend:', error);
+        // Fallback to a client-side generated URL if your API supports it
+        showSnackbar('Ошибка получения URL авторизации. Попробуйте обновить страницу.', 'error');
+        return;
+      }
+      
+      console.log('Using VK auth URL with PKCE parameters:', authUrl);
       
       if (!authUrl) {
         showSnackbar('Ошибка получения URL авторизации. Попробуйте обновить страницу.', 'error');
@@ -381,7 +404,6 @@ const VkAuthManager = () => {
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
             <Chip label="wall (стена)" color="success" variant="outlined" />
-            <Chip label="manage (управление сообществом)" color="success" variant="outlined" />
             <Chip label="photos (фотографии)" color="success" variant="outlined" />
             <Chip label="groups (сообщества)" color="success" variant="outlined" />
           </Box>
@@ -404,13 +426,11 @@ const VkAuthManager = () => {
             </Alert>
           )}
           {tokens.some(token => {
-            // Check if token has the required permissions
-            // Handle both array and space-separated string formats
-            const tokenScopes = Array.isArray(token.scope) 
-              ? token.scope 
-              : (typeof token.scope === 'string' ? token.scope.split(' ') : []);
+            // Parse scopes correctly from the complex format
+            const tokenScopes = parseScopes(token.scope);
             
-            const requiredScopes = ['wall', 'photos', 'groups', 'manage'];
+            // Updated required scopes - removed 'manage' as it's not needed for user tokens
+            const requiredScopes = ['wall', 'photos', 'groups'];
             const missingScopes = requiredScopes.filter(scope => !tokenScopes.includes(scope));
             
             return token.isActive && missingScopes.length > 0;
@@ -418,7 +438,7 @@ const VkAuthManager = () => {
             <Alert severity="error" sx={{ mt: 2 }}>
               <Typography variant="subtitle2">Обнаружен токен с недостаточными правами!</Typography>
               <Typography variant="body2">
-                Для работы публикации в сообществах необходимы права: wall, photos, groups, manage. Пожалуйста, удалите текущий токен и авторизуйтесь заново.
+                Для работы публикации в сообществах необходимы права: wall, photos, groups. Пожалуйста, удалите текущий токен и авторизуйтесь заново.
               </Typography>
             </Alert>
           )}
@@ -507,10 +527,8 @@ const VkAuthManager = () => {
                         <TableCell>
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                             {(() => {
-                              // Handle both array and space-separated string formats
-                              const scopes = Array.isArray(token.scope) 
-                                ? token.scope 
-                                : (typeof token.scope === 'string' ? token.scope.split(' ') : []);
+                              // Parse scopes correctly from the complex format
+                              const scopes = parseScopes(token.scope);
                               
                               return scopes.slice(0, 5).map((scope, index) => (
                                 <Chip
@@ -518,14 +536,12 @@ const VkAuthManager = () => {
                                   label={scope}
                                   size="small"
                                   variant="outlined"
-                                  color={['wall', 'photos', 'groups', 'manage'].includes(scope) ? 'success' : 'default'}
+                                  color={['wall', 'photos', 'groups'].includes(scope) ? 'success' : 'default'}
                                 />
                               ));
                             })()}
                             {(() => {
-                              const scopes = Array.isArray(token.scope) 
-                                ? token.scope 
-                                : (typeof token.scope === 'string' ? token.scope.split(' ') : []);
+                              const scopes = parseScopes(token.scope);
                               
                               return scopes.length > 5 && (
                                 <Chip
@@ -536,11 +552,10 @@ const VkAuthManager = () => {
                               );
                             })()}
                             {(() => {
-                              const scopes = Array.isArray(token.scope) 
-                                ? token.scope 
-                                : (typeof token.scope === 'string' ? token.scope.split(' ') : []);
+                              const scopes = parseScopes(token.scope);
                               
-                              const requiredScopes = ['wall', 'photos', 'groups', 'manage'];
+                              // Updated required scopes - removed 'manage'
+                              const requiredScopes = ['wall', 'photos', 'groups'];
                               const missingScopes = requiredScopes.filter(scope => !scopes.includes(scope));
                               
                               return missingScopes.length > 0 && (
