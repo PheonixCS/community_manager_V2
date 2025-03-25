@@ -12,7 +12,12 @@ router.get('/auth-url', (req, res) => {
     // Get the correct redirect URI from configuration or environment
     const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
     
+    // Generate auth URL with the updated scope implementation
     const authUrl = vkAuthService.getAuthUrl(redirectUri);
+    
+    // Log the complete URL for debugging
+    console.log('Generated complete VK auth URL:', authUrl);
+    
     res.json({ authUrl });
   } catch (error) {
     console.error('Error generating auth URL:', error);
@@ -26,7 +31,10 @@ router.get('/auth-url', (req, res) => {
  */
 router.get('/callback', async (req, res) => {
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
+    
+    // Log the incoming request parameters
+    console.log('VK auth callback received with params:', req.query);
     
     if (!code) {
       throw new Error('Authorization code not provided');
@@ -38,11 +46,15 @@ router.get('/callback', async (req, res) => {
     // Получаем токен по коду
     const result = await vkAuthService.getTokenByCode(code, redirectUri);
     
+    // Log the received token scope for debugging
+    console.log('Received token with scope:', result.token.scope);
+    
     // В реальном приложении здесь должно быть перенаправление на фронтенд с сообщением об успехе
     res.json({
       status: 'success',
       message: 'Authorization successful',
-      user: result.user
+      user: result.user,
+      scope: result.token.scope
     });
   } catch (error) {
     console.error('Error processing auth callback:', error);

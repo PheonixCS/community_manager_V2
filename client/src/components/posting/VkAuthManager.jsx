@@ -168,6 +168,9 @@ const VkAuthManager = () => {
       return;
     }
     
+    // Show permission guidance directly to user
+    showSnackbar('Важно! Для работы необходимо разрешить ВСЕ запрашиваемые права доступа.', 'warning');
+    
     // Open the auth URL in a new window
     const authWindow = window.open(authUrl, 'VK Authorization', 'width=800,height=600');
     
@@ -216,19 +219,19 @@ const VkAuthManager = () => {
           </Typography>
           <Typography variant="body1" paragraph>
             Для публикации постов необходим активный токен пользователя ВКонтакте с правильными разрешениями.
-            <strong> Токен должен иметь разрешения: wall, photos, groups!</strong>
+            <strong> Необходимо разрешить все запрашиваемые права доступа!</strong>
           </Typography>
           <Typography variant="body1" paragraph>
             1. Нажмите кнопку "Новая авторизация"
           </Typography>
-          <Typography variant="body1" paragraph>
-            2. В открывшемся окне <strong>обязательно разрешите ВСЕ запрашиваемые права</strong> приложению к вашему аккаунту ВКонтакте
+          <Typography variant="body1" paragraph sx={{ color: 'error.main', fontWeight: 'bold' }}>
+            2. В открывшемся окне <strong>обязательно отметьте все галочки и нажмите "Разрешить"</strong>
           </Typography>
           <Typography variant="body1" paragraph>
-            3. Если вы ранее отказали в каких-то правах, необходимо удалить текущий токен и авторизоваться заново
+            3. Если вы ранее отказали в каких-то правах, необходимо удалить токен и авторизоваться заново
           </Typography>
-          <Typography variant="body1">
-            Токен будет автоматически обновляться системой, пока у приложения есть доступ к вашему аккаунту.
+          <Typography variant="body2" paragraph sx={{ fontStyle: 'italic', mt: 2 }}>
+            Запрашиваемые разрешения: доступ к стене, фотографиям, видео, документам, управлению сообществами
           </Typography>
           {tokens.length === 0 && (
             <Alert severity="warning" sx={{ mt: 2 }}>

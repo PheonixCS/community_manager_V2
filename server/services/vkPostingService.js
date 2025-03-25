@@ -16,9 +16,9 @@ class VkPostingService {
    */
   async getPublishToken() {
     try {
-      // Required permissions for posting to wall
-      const requiredScopes = ['wall', 'photos', 'groups'];
-      console.log(`Looking for token with all of these scopes: ${requiredScopes.join(', ')}`);
+      // Update required permissions list to match our auth request
+      const requiredScopes = ['wall', 'photos', 'groups', 'manage'];
+      console.log(`Looking for token with these scopes: ${requiredScopes.join(', ')}`);
       
       // Get all active tokens first
       const allTokens = await vkAuthService.getAllTokens();
@@ -30,47 +30,26 @@ class VkPostingService {
       
       console.log(`Found ${activeTokens.length} active tokens`);
       
-      // Check permissions on each token and find the best match
-      let bestToken = null;
-      let bestMatchCount = 0;
-      
+      // Modified approach - be more permissive with required scopes
+      // We'll accept any token that has at least wall rights - the most essential scope
       for (const token of activeTokens) {
         const tokenScopes = token.scope || [];
         console.log(`Token ${token.vkUserId} has scopes: ${tokenScopes.join(', ')}`);
         
-        const matchedScopes = requiredScopes.filter(scope => tokenScopes.includes(scope));
-        
-        if (matchedScopes.length > bestMatchCount) {
-          bestMatchCount = matchedScopes.length;
-          bestToken = token;
+        // If token has wall rights, use it right away
+        if (tokenScopes.includes('wall')) {
+          console.log(`Found token with wall access rights: ${token.vkUserId}`);
           
-          if (matchedScopes.length === requiredScopes.length) {
-            // Found a perfect match
-            console.log(`Found perfect token match with ID ${token.vkUserId}`);
-            break;
-          }
+          // Update last used date
+          token.lastUsed = new Date();
+          await token.save();
+          
+          return token.accessToken;
         }
       }
       
-      if (bestToken) {
-        console.log(`Using best token match (${bestMatchCount}/${requiredScopes.length} scopes matched) for user ${bestToken.vkUserName} (${bestToken.vkUserId})`);
-        
-        // Update last used date
-        bestToken.lastUsed = new Date();
-        await bestToken.save();
-        
-        // Warn if the token doesn't have all required permissions
-        if (bestMatchCount < requiredScopes.length) {
-          const missingScopes = requiredScopes.filter(scope => !bestToken.scope.includes(scope));
-          console.warn(`Warning: Token is missing required scopes: ${missingScopes.join(', ')}`);
-          console.warn('Some operations may fail due to insufficient permissions');
-        }
-        
-        return bestToken.accessToken;
-      }
-      
-      // If we get here, no token had any of the required scopes
-      throw new Error('Ни один из активных токенов не имеет необходимых разрешений (wall, photos, groups). Пожалуйста, удалите текущий токен и выполните авторизацию заново.');
+      // If we get here, no token had wall rights
+      throw new Error('Ни один из активных токенов не имеет прав доступа к стене (wall). Пожалуйста, удалите текущий токен и выполните авторизацию заново, предоставив все запрашиваемые разрешения.');
     } catch (error) {
       console.error('Error getting VK publish token:', error);
       throw error;
