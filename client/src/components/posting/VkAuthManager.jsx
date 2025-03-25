@@ -41,8 +41,13 @@ const VkAuthManager = () => {
   useEffect(() => {
     const initData = async () => {
       await fetchTokens();
-      // We need to fetch the auth URL on component mount for button activation
-      await fetchAuthUrl();
+      // We'll make this non-blocking and handle errors better
+      try {
+        await fetchAuthUrl();
+      } catch (error) {
+        console.log('Initial auth URL fetch failed, will retry when needed', error);
+        // We don't show error here to avoid confusion on page load
+      }
     };
     
     initData();
@@ -61,15 +66,17 @@ const VkAuthManager = () => {
     }
   };
 
-  // Add the missing fetchAuthUrl function
+  // Update the fetchAuthUrl function to handle errors better
   const fetchAuthUrl = async () => {
     try {
       const response = await axios.get('/api/vk-auth/auth-url');
       setAuthUrl(response.data.authUrl);
-      console.log('Fetched initial VK auth URL for button activation');
+      console.log('Fetched VK auth URL for button activation');
+      return response.data.authUrl; // Return the URL for immediate use if needed
     } catch (error) {
       console.error('Error fetching auth URL:', error);
-      showSnackbar('Ошибка при получении URL авторизации', 'error');
+      // We don't show the snackbar here anymore to avoid confusion on initial load
+      throw error; // Rethrow so caller can handle if needed
     }
   };
 
@@ -396,7 +403,18 @@ const VkAuthManager = () => {
               У вас нет активных токенов. Без токена публикация постов невозможна!
             </Alert>
           )}
-          {tokens.some(token => token.isActive && (!token.scope.includes('wall') || !token.scope.includes('photos') || !token.scope.includes('groups') || !token.scope.includes('manage'))) && (
+          {tokens.some(token => {
+            // Check if token has the required permissions
+            // Handle both array and space-separated string formats
+            const tokenScopes = Array.isArray(token.scope) 
+              ? token.scope 
+              : (typeof token.scope === 'string' ? token.scope.split(' ') : []);
+            
+            const requiredScopes = ['wall', 'photos', 'groups', 'manage'];
+            const missingScopes = requiredScopes.filter(scope => !tokenScopes.includes(scope));
+            
+            return token.isActive && missingScopes.length > 0;
+          }) && (
             <Alert severity="error" sx={{ mt: 2 }}>
               <Typography variant="subtitle2">Обнаружен токен с недостаточными правами!</Typography>
               <Typography variant="body2">
@@ -488,35 +506,53 @@ const VkAuthManager = () => {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {token.scope.slice(0, 5).map((scope, index) => (
-                              <Chip
-                                key={index}
-                                label={scope}
-                                size="small"
-                                variant="outlined"
-                                color={
-                                  ['wall', 'photos', 'groups'].includes(scope) 
-                                    ? 'success' 
-                                    : 'default'
-                                }
-                              />
-                            ))}
-                            {token.scope.length > 5 && (
-                              <Chip
-                                label={`+${token.scope.length - 5}`}
-                                size="small"
-                                variant="outlined"
-                              />
-                            )}
-                            {['wall', 'photos', 'groups'].some(required => !token.scope.includes(required)) && (
-                              <Tooltip title="Отсутствуют необходимые права для публикации">
+                            {(() => {
+                              // Handle both array and space-separated string formats
+                              const scopes = Array.isArray(token.scope) 
+                                ? token.scope 
+                                : (typeof token.scope === 'string' ? token.scope.split(' ') : []);
+                              
+                              return scopes.slice(0, 5).map((scope, index) => (
                                 <Chip
-                                  label="Недостаточно прав"
+                                  key={index}
+                                  label={scope}
                                   size="small"
-                                  color="error"
+                                  variant="outlined"
+                                  color={['wall', 'photos', 'groups', 'manage'].includes(scope) ? 'success' : 'default'}
                                 />
-                              </Tooltip>
-                            )}
+                              ));
+                            })()}
+                            {(() => {
+                              const scopes = Array.isArray(token.scope) 
+                                ? token.scope 
+                                : (typeof token.scope === 'string' ? token.scope.split(' ') : []);
+                              
+                              return scopes.length > 5 && (
+                                <Chip
+                                  label={`+${scopes.length - 5}`}
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              );
+                            })()}
+                            {(() => {
+                              const scopes = Array.isArray(token.scope) 
+                                ? token.scope 
+                                : (typeof token.scope === 'string' ? token.scope.split(' ') : []);
+                              
+                              const requiredScopes = ['wall', 'photos', 'groups', 'manage'];
+                              const missingScopes = requiredScopes.filter(scope => !scopes.includes(scope));
+                              
+                              return missingScopes.length > 0 && (
+                                <Tooltip title={`Отсутствуют права: ${missingScopes.join(', ')}`}>
+                                  <Chip
+                                    label="Недостаточно прав"
+                                    size="small"
+                                    color="error"
+                                  />
+                                </Tooltip>
+                              );
+                            })()}
                           </Box>
                         </TableCell>
                         <TableCell>
