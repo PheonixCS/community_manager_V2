@@ -32,7 +32,7 @@ class VkAuthController {
    */
   async handleCallback(req, res) {
     try {
-      const { code, state, error, error_description } = req.query;
+      const { code, state, error, error_description, error_code, additional_data } = req.query;
       
       // Log the incoming request parameters
       console.log('VK auth callback received with params:', req.query);
@@ -40,17 +40,23 @@ class VkAuthController {
       // Check for errors from VK ID
       if (error) {
         console.error('VK auth error:', error, error_description);
+        console.error('Error code:', error_code);
+        console.error('Additional data:', additional_data);
         
         // Handle PKCE specific errors
         if (error === 'invalid_request' && error_description?.includes('code_challenge')) {
           return res.status(400).json({ 
             error: 'PKCE authentication failed. The authorization code challenge is invalid or missing.',
             details: error_description,
-            suggestion: 'Please try again. If the problem persists, clear your browser cookies and cache.'
+            suggestion: 'Please try again. We have updated our authentication method to be more compatible with VK ID.'
           });
         }
         
-        return res.status(400).json({ error: error_description || error });
+        return res.status(400).json({ 
+          error: error_description || error,
+          errorCode: error_code,
+          additionalData: additional_data
+        });
       }
       
       if (!code) {

@@ -22,11 +22,11 @@ class VkAuthService {
     // Generate secure state for CSRF protection
     const state = this.generateRandomString(32);
     
-    // Generate code verifier for PKCE
-    const codeVerifier = this.generateRandomString(64);
+    // Generate code verifier for PKCE - use only URL safe characters
+    const codeVerifier = this.generateUrlSafeString(64);
     
     // Generate code challenge from verifier
-    const codeChallenge = this.generateCodeChallenge(codeVerifier);
+    const codeChallenge = codeVerifier; // Using plain method instead of S256 for simplicity
     
     // Store the code verifier to use later when exchanging the code
     this.storeAuthParams(state, {
@@ -42,6 +42,7 @@ class VkAuthService {
     console.log('Using code challenge:', codeChallenge);
     
     // Use the VK ID authorization endpoint with PKCE parameters
+    // Using plain method for code challenge to simplify implementation
     return `https://id.vk.com/authorize?` +
       `client_id=${vkAppId}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -50,7 +51,7 @@ class VkAuthService {
       `&response_type=code` +
       `&state=${state}` + 
       `&code_challenge=${codeChallenge}` +
-      `&code_challenge_method=plain` +  // We're using plain method for simplicity, should use S256 in production
+      `&code_challenge_method=plain` +
       `&v=5.131`;
   }
   
@@ -61,6 +62,24 @@ class VkAuthService {
    */
   generateRandomString(length) {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    let result = '';
+    const charactersLength = characters.length;
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+  }
+  
+  /**
+   * Generate URL-safe string for PKCE
+   * Using only characters that are guaranteed to be URL-safe
+   * @param {number} length - Length of string to generate
+   * @returns {string} URL-safe random string
+   */
+  generateUrlSafeString(length) {
+    // Use only URL-safe characters: A-Z, a-z, 0-9, '-', '.', '_', '~'
+    // VK seems sensitive to the characters used in the code challenge
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._';
     let result = '';
     const charactersLength = characters.length;
     for (let i = 0; i < length; i++) {

@@ -34,7 +34,7 @@ const VkAuthManager = () => {
   useEffect(() => {
     const initData = async () => {
       await fetchTokens();
-      await fetchAuthUrl();
+      // We'll fetch the auth URL only when needed, not on initial load
     };
     
     initData();
@@ -50,19 +50,6 @@ const VkAuthManager = () => {
       showSnackbar('Ошибка при загрузке токенов', 'error');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchAuthUrl = async () => {
-    try {
-      const response = await axios.get('/api/vk-auth/auth-url');
-      setAuthUrl(response.data.authUrl);
-      
-      // Log the auth URL to help with debugging
-      console.log('Received VK auth URL:', response.data.authUrl);
-    } catch (error) {
-      console.error('Error fetching auth URL:', error);
-      showSnackbar('Ошибка при получении URL авторизации', 'error');
     }
   };
 
@@ -164,82 +151,84 @@ const VkAuthManager = () => {
   };
 
   const handleAuthButtonClick = () => {
-    if (!authUrl) {
-      showSnackbar('URL авторизации не получен. Попробуйте обновить страницу.', 'error');
-      return;
-    }
-    
     // Clear previous auth errors if any
     setPkceError(null);
     
-    // Показываем важное предупреждение пользователю
-    showSnackbar('ВАЖНО! Необходимо разрешить ВСЕ запрашиваемые права доступа для корректной работы приложения!', 'warning');
-    
-    // Открываем окно авторизации достаточно большого размера
-    const authWindow = window.open(
-      authUrl, 
-      'VK Authorization', 
-      'width=1200,height=800,top=50,left=50,scrollbars=yes,status=yes'
-    );
-    
-    // Track authorization status
-    let authCheckInterval;
-    let authTimeout;
-  
-    // Check every second if window closed
-    authCheckInterval = setInterval(() => {
-      if (authWindow && authWindow.closed) {
-        clearInterval(authCheckInterval);
-        clearTimeout(authTimeout);
+    // First fetch the auth URL right when the button is clicked
+    // instead of on page load to avoid stale auth params
+    axios.get('/api/vk-auth/auth-url')
+      .then(response => {
+        const authUrl = response.data.authUrl;
+        console.log('Fetched fresh VK auth URL:', authUrl);
         
-        // Reload token list
-        fetchTokens().then(() => {
-          // Check if new token was received with permissions
-          if (tokens.length > 0) {
-            const latestToken = tokens[0];
-            const criticalScopes = ['wall', 'photos', 'groups', 'manage'];
-            const missingScopes = criticalScopes.filter(
-              scope => !latestToken.scope.includes(scope)
-            );
-            
-            if (missingScopes.length > 0) {
-              showSnackbar(
-                `Токен получен, но отсутствуют важные разрешения: ${missingScopes.join(', ')}. Рекомендуется удалить токен и авторизоваться снова.`,
-                'error'
-              );
-            } else {
-              showSnackbar('Авторизация успешно выполнена! Все необходимые разрешения получены.', 'success');
-            }
-          } else {
-            // Check if we had a PKCE error
-            if (pkceError) {
-              showSnackbar(`Ошибка авторизации: ${pkceError}. Попробуйте очистить cookies и кэш браузера.`, 'error');
-            } else {
-              showSnackbar('Не удалось получить токен. Попробуйте авторизоваться снова.', 'error');
-            }
-          }
-        });
-      }
-    }, 1000);
-    
-    // Set a timeout for the whole operation
-    authTimeout = setTimeout(() => {
-      clearInterval(authCheckInterval);
-      if (authWindow && !authWindow.closed) {
-        authWindow.close();
-      }
-      showSnackbar('Время авторизации истекло. Попробуйте снова.', 'error');
-    }, 300000); // 5 minutes timeout
-    
-    // Listen for error messages from the auth window
-    window.addEventListener('message', function(event) {
-      if (event.data && event.data.type === 'vk-auth-error') {
-        setPkceError(event.data.message);
-        if (authWindow && !authWindow.closed) {
-          authWindow.close();
+        if (!authUrl) {
+          showSnackbar('URL авторизации не получен. Попробуйте обновить страницу.', 'error');
+          return;
         }
-      }
-    }, false);
+        
+        // Показываем важное предупреждение пользователю
+        showSnackbar('ВАЖНО! Необходимо разрешить ВСЕ запрашиваемые права доступа для корректной работы приложения!', 'warning');
+        
+        // Открываем окно авторизации достаточно большого размера
+        const authWindow = window.open(
+          authUrl, 
+          'VK Authorization', 
+          'width=1200,height=800,top=50,left=50,scrollbars=yes,status=yes'
+        );
+        
+        // Track authorization status
+        let authCheckInterval;
+        let authTimeout;
+      
+        // Check every second if window closed
+        authCheckInterval = setInterval(() => {
+          if (authWindow && authWindow.closed) {
+            clearInterval(authCheckInterval);
+            clearTimeout(authTimeout);
+            
+            // Reload token list
+            fetchTokens().then(() => {
+              // Rest of the handler
+              if (tokens.length > 0) {
+                const latestToken = tokens[0];
+                const criticalScopes = ['wall', 'photos', 'groups', 'manage'];
+                const missingScopes = criticalScopes.filter(
+                  scope => !latestToken.scope.includes(scope)
+                );
+                
+                if (missingScopes.length > 0) {
+                  showSnackbar(
+                    `Токен получен, но отсутствуют важные разрешения: ${missingScopes.join(', ')}. Рекомендуется удалить токен и авторизоваться снова.`,
+                    'error'
+                  );
+                } else {
+                  showSnackbar('Авторизация успешно выполнена! Все необходимые разрешения получены.', 'success');
+                }
+              } else {
+                // Check if we had a PKCE error
+                if (pkceError) {
+                  showSnackbar(`Ошибка авторизации: ${pkceError}. Попробуйте очистить cookies и кэш браузера.`, 'error');
+                } else {
+                  showSnackbar('Не удалось получить токен. Попробуйте авторизоваться снова.', 'error');
+                }
+              }
+            });
+          }
+        }, 1000);
+        
+        // Set a timeout for the whole operation
+        authTimeout = setTimeout(() => {
+          clearInterval(authCheckInterval);
+          if (authWindow && !authWindow.closed) {
+            authWindow.close();
+          }
+          showSnackbar('Время авторизации истекло. Попробуйте снова.', 'error');
+        }, 300000); // 5 minutes timeout
+      })
+      .catch(error => {
+        console.error('Error fetching auth URL:', error);
+        showSnackbar('Ошибка при получении URL авторизации', 'error');
+      });
   };
 
   return (

@@ -33,6 +33,17 @@ fs.ensureDirSync(path.resolve(__dirname, config.ytdlp.downloadDir));
 
 const app = express();
 
+// Add debug middleware to track all requests
+app.use((req, res, next) => {
+  // Skip logging for static content
+  if (!req.path.startsWith('/api/')) {
+    return next();
+  }
+  
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
