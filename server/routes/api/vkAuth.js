@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const vkAuthService = require('../../services/vkAuthService');
-const config = require('../../config');
+const config = require('../../config/config');
 
 /**
  * Получение URL для авторизации в ВК
