@@ -1,0 +1,22 @@
+# Dependencies
+/node_modules
+
+# Logs
+/logs
+*.log
+
+# Runtime data
+/downloads
+!/downloads/.gitkeep
+/downloads/photos/*
+!/downloads/photos/.gitkeep
+/downloads/videos/*
+!/downloads/videos/.gitkeep
+/downloads/documents/*
+!/downloads/documents/.gitkeep
+/downloads/audio/*
+!/downloads/audio/.gitkeep
+
+# Temp files and directories
+/temp
+/tmp

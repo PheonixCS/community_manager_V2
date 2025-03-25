@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # MongoDB сервис
+  mongo:
+    image: mongo:latest
+    container_name: vk-scraper-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
+  # Minio S3 хранилище
+  s3:
+    image: minio/minio
+    container_name: vk-scraper-s3
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - app-network
+
+  # Создание бакетов S3 при первом запуске
+  createbuckets:
+    image: minio/mc
+    container_name: vk-scraper-s3-init
+    depends_on:
+      - s3
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc config host add myminio http://s3:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/vk-media;
+      /usr/bin/mc policy set public myminio/vk-media;
+      exit 0;
+      "
+    networks:
+      - app-network
+
+  # Серверная часть на Express.js
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: vk-scraper-server
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=mongodb://mongo:27017/vk_scraper
+      - VK_SERVICE_KEY=${VK_SERVICE_KEY}
+      - VK_API_VERSION=5.131
+      - S3_ENDPOINT=http://s3:9000
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin
+      - S3_BUCKET=vk-media
+      - DOWNLOAD_MEDIA=true
+    volumes:
+      - ./server/downloads:/usr/src/app/downloads
+    depends_on:
+      - mongo
+      - s3
+      - createbuckets
+    networks:
+      - app-network
+
+  # Клиентская часть на React
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: vk-scraper-client
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
+    driver: local
+  minio-data:
+    driver: local
