@@ -44,15 +44,15 @@ class VkPostingService {
         console.log(`Token ${token.vkUserId} has scopes: ${tokenScopes.join(', ')}`);
         
         // Check specifically if token has wall AND manage rights for posting to community walls
-        if (tokenScopes.includes('wall')) {
-          console.log(`Found token with wall+manage access rights: ${token.vkUserId}`);
-          
-          // Update last used date
-          token.lastUsed = new Date();
-          await token.save();
-          
-          return token.accessToken;
-        }
+        // if (tokenScopes.includes('wall')) {
+        console.log(`Found token with wall+manage access rights: ${token.vkUserId}`);
+        
+        // Update last used date
+        token.lastUsed = new Date();
+        await token.save();
+        
+        return token.accessToken;
+        // }
       }
       
       // If we get here, no token had the proper rights
