@@ -2,14 +2,14 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const VkUserTokenSchema = new Schema({
-  // Пользователь ВК, которому принадлежит токен
+  // ID пользователя ВКонтакте
   vkUserId: {
     type: String,
     required: true,
-    index: true
+    unique: true
   },
   
-  // Имя пользователя (для отображения в интерфейсе)
+  // Имя пользователя для отображения
   vkUserName: {
     type: String,
     required: true
@@ -21,80 +21,91 @@ const VkUserTokenSchema = new Schema({
     required: true
   },
   
-  // Токен обновления для получения нового access_token когда текущий истечет
+  // Refresh token для обновления
   refreshToken: {
     type: String
   },
   
-  // Время истечения токена доступа в формате UNIX timestamp
+  // Время истечения токена (unixtime)
   expiresAt: {
-    type: Number,
-    required: true
+    type: Number
   },
   
-  // Список разрешений, которые были запрошены при получении токена
+  // Массив разрешений, которые есть у токена
   scope: {
     type: [String],
     default: []
   },
   
-  // Флаг активности токена (можно деактивировать токен без удаления)
+  // Статус активности токена
   isActive: {
     type: Boolean,
     default: true
   },
   
-  // Дата последнего использования токена
+  // Дата и время последнего использования
   lastUsed: {
     type: Date
   },
   
-  // Дата последнего обновления токена
+  // Дата и время последнего обновления токена
   lastRefreshed: {
     type: Date
   },
   
-  // Дополнительная информация о пользователе (аватар, URL профиля и т.д.)
+  // Информация о пользователе ВК 
   userInfo: {
     type: Schema.Types.Mixed
-  },
-  
-  // Метаданные
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
   }
-}, { timestamps: true });
+}, { 
+  timestamps: true 
+});
 
-// Метод проверки истечения токена
+// Метод для проверки, истек ли токен
 VkUserTokenSchema.methods.isExpired = function() {
-  // Запас в 5 минут, чтобы успеть обновить токен до его фактического истечения
-  const bufferTime = 5 * 60; // 5 минут в секундах
-  const currentTime = Math.floor(Date.now() / 1000);
-  return currentTime + bufferTime >= this.expiresAt;
+  if (!this.expiresAt) return false;
+  return Math.floor(Date.now() / 1000) >= this.expiresAt;
 };
 
-// Метод проверки наличия нужных разрешений
-VkUserTokenSchema.methods.hasScope = function(requiredScope) {
-  if (!Array.isArray(requiredScope)) {
-    requiredScope = [requiredScope];
-  }
+// Статичный метод для поиска активного токена с нужными разрешениями (исправлен)
+VkUserTokenSchema.statics.findActiveWithScope = async function(requiredScopes) {
+  const scopeArray = Array.isArray(requiredScopes) ? requiredScopes : [requiredScopes];
   
-  return requiredScope.every(scopeItem => this.scope.includes(scopeItem));
-};
-
-// Статический метод для поиска активного токена с нужными разрешениями
-VkUserTokenSchema.statics.findActiveWithScope = async function(requiredScope) {
-  const tokens = await this.find({ isActive: true }).sort({ updatedAt: -1 });
+  // Находим все активные токены
+  const activeTokens = await this.find({
+    isActive: true,
+    expiresAt: { $gt: Math.floor(Date.now() / 1000) }
+  });
   
-  for (const token of tokens) {
-    if (!token.isExpired() && token.hasScope(requiredScope)) {
+  // Ранжируем токены по количеству совпадающих scope
+  let bestToken = null;
+  let bestMatch = 0;
+  
+  for (const token of activeTokens) {
+    // Количество совпадающих scope
+    const matchCount = scopeArray.filter(scope => 
+      token.scope && token.scope.includes(scope)
+    ).length;
+    
+    if (matchCount > bestMatch) {
+      bestMatch = matchCount;
+      bestToken = token;
+    }
+    
+    // Если нашли полное совпадение, возвращаем сразу
+    if (matchCount === scopeArray.length) {
       return token;
     }
+  }
+  
+  // Если есть хотя бы частичное совпадение, возвращаем лучший результат
+  if (bestToken && bestMatch > 0) {
+    return bestToken;
+  }
+  
+  // Если не нашли совпадений, но есть активные токены - возвращаем первый
+  if (activeTokens.length > 0) {
+    return activeTokens[0];
   }
   
   return null;

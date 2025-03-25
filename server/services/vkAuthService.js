@@ -230,20 +230,73 @@ class VkAuthService {
    */
   async getActiveToken(requiredScope) {
     try {
-      // Находим подходящий токен
-      let token = await VkUserToken.findActiveWithScope(requiredScope);
+      const scopeArray = Array.isArray(requiredScope) ? requiredScope : [requiredScope];
       
-      // Если токен существует, но истек - пробуем его обновить
-      if (token && token.isExpired() && token.refreshToken) {
-        console.log(`Token for user ${token.vkUserId} expired, refreshing...`);
-        token = await this.refreshToken(token.vkUserId);
+      // Выводим для отладки, какие разрешения мы ищем
+      console.log(`Looking for token with scopes: ${scopeArray.join(',')}`);
+      
+      // Более гибкий поиск токена: находим активные токены
+      const activeTokens = await VkUserToken.find({ 
+        isActive: true,
+        expiresAt: { $gt: Math.floor(Date.now() / 1000) }
+      });
+      
+      console.log(`Found ${activeTokens.length} active non-expired tokens`);
+      
+      if (activeTokens.length === 0) {
+        return null;
       }
       
-      // Если токен существует и действителен - обновляем дату последнего использования
-      if (token && !token.isExpired()) {
-        token.lastUsed = new Date();
-        await token.save();
-        return token;
+      // Проверяем наличие необходимых разрешений - более лояльно
+      // Ищем токен, у которого есть хотя бы одно из требуемых разрешений
+      let bestToken = null;
+      let bestScopeMatch = 0;
+      
+      for (const token of activeTokens) {
+        // Смотрим, сколько из требуемых разрешений есть у токена
+        const matchedScopes = scopeArray.filter(scope => 
+          token.scope && token.scope.includes(scope)
+        ).length;
+        
+        // Если есть хотя бы одно совпадение и это лучше предыдущего - запоминаем
+        if (matchedScopes > 0 && matchedScopes > bestScopeMatch) {
+          bestToken = token;
+          bestScopeMatch = matchedScopes;
+        }
+        
+        // Если нашли токен со всеми разрешениями - возвращаем его сразу
+        if (matchedScopes === scopeArray.length) {
+          console.log(`Found token with all required scopes: ${token.vkUserId}`);
+          
+          // Обновляем дату использования
+          token.lastUsed = new Date();
+          await token.save();
+          
+          return token;
+        }
+      }
+      
+      // Если нашли токен хотя бы с одним разрешением - используем его
+      if (bestToken) {
+        console.log(`Using token with partial scope match (${bestScopeMatch}/${scopeArray.length}): ${bestToken.vkUserId}`);
+        
+        // Обновляем дату использования
+        bestToken.lastUsed = new Date();
+        await bestToken.save();
+        
+        return bestToken;
+      }
+      
+      // Если не нашли подходящий токен, но есть активные - берем первый
+      if (activeTokens.length > 0) {
+        console.log(`No tokens with required scopes found. Using first active token: ${activeTokens[0].vkUserId}`);
+        console.log(`Available scopes: ${activeTokens[0].scope}`);
+        
+        // Обновляем дату использования
+        activeTokens[0].lastUsed = new Date();
+        await activeTokens[0].save();
+        
+        return activeTokens[0];
       }
       
       return null;

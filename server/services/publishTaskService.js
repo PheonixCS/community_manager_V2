@@ -172,7 +172,18 @@ class PublishTaskService {
     for (const targetGroup of task.targetGroups) {
       for (const post of bestPosts) {
         try {
-          // Публикуем пост в целевую группу
+          // 1. Проверяем наличие активных токенов перед публикацией
+          const vkAuthService = require('./vkAuthService');
+          const tokens = await vkAuthService.getAllTokens();
+          const activeTokens = tokens.filter(t => t.isActive);
+          
+          if (activeTokens.length === 0) {
+            throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
+          }
+          
+          console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens.length} active tokens`);
+          
+          // 2. Публикуем пост в целевую группу
           const publishResult = await vkPostingService.publishExistingPost(
             post._id.toString(),
             targetGroup.groupId,

@@ -18,15 +18,39 @@ class VkPostingService {
     try {
       // Сначала пытаемся получить пользовательский токен с нужными правами
       const requiredScope = ['wall', 'groups'];
-      const userToken = await vkAuthService.getActiveToken(requiredScope);
+      
+      // 1. Пробуем сначала найти любой активный токен
+      let userToken = await vkAuthService.getActiveToken(requiredScope);
+      
+      if (!userToken) {
+        console.log('No token with both wall and groups scope found, trying with just wall scope...');
+        // 2. Если не найден с обоими разрешениями, пробуем хотя бы с wall
+        userToken = await vkAuthService.getActiveToken(['wall']);
+      }
       
       if (userToken) {
-        console.log(`Using VK user token for user ${userToken.vkUserName} (${userToken.vkUserId})`);
+        console.log(`Using VK user token for user ${userToken.vkUserName} (${userToken.vkUserId}), scope: ${userToken.scope.join(',')}`);
         return userToken.accessToken;
       }
       
+      // 3. Пробуем получить все токены и посмотреть, в чем проблема
+      const allTokens = await vkAuthService.getAllTokens();
+      if (allTokens && allTokens.length > 0) {
+        const activeTokens = allTokens.filter(t => t.isActive);
+        
+        if (activeTokens.length > 0) {
+          console.log(`Found ${activeTokens.length} active tokens but none with required scopes. Using first available token.`);
+          console.log(`Token scopes available: ${activeTokens[0].scope.join(',')}`);
+          // Используем первый активный токен, даже если у него нет всех нужных прав
+          return activeTokens[0].accessToken;
+        } else {
+          console.log(`Found ${allTokens.length} tokens but none are active`);
+        }
+      } else {
+        console.log('No VK user tokens found in database');
+      }
+      
       // Если дошли до этой точки, значит пользовательский токен не найден
-      // При публикации постов сервисный токен НЕ годится - нужен только токен пользователя
       throw new Error('Не найден активный пользовательский токен ВКонтакте. Необходимо авторизоваться в ВКонтакте через раздел "Авторизация ВКонтакте".');
     } catch (error) {
       console.error('Error getting VK publish token:', error);
