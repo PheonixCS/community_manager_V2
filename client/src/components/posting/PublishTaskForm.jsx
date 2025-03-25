@@ -627,7 +627,8 @@ const PublishTaskForm = () => {
   
   const getScrapingTaskName = (taskId) => {
     const task = availableScrapingTasks.find(t => t._id === taskId);
-    return task ? task.name : taskId;
+    // Fix: Return string representation rather than the object itself
+    return task ? task.name : (typeof taskId === 'string' ? taskId : String(taskId));
   };
   
   const getParamInput = (param) => {

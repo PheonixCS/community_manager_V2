@@ -254,23 +254,66 @@ class PublishTaskService {
           try {
             console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens?.length || 'unknown'} active tokens`);
             
-            // Применяем трансформации текста согласно настройкам задачи, если необходимо
-            if (post.text && (task.publishOptions.removeHashtags || task.publishOptions.transliterate)) {
-              // Создаем копию поста для модификации
-              const modifiedPost = { ...post.toObject() };
-              
-              // Удаляем хештеги, если включена соответствующая опция
-              if (task.publishOptions.removeHashtags) {
-                modifiedPost.text = this.removeHashtags(modifiedPost.text);
+            // Создаем копию поста для модификации
+            const modifiedPost = { ...post.toObject() };
+            
+            // Применяем трансформации текста согласно настройкам задачи публикации
+            if (task.publishOptions.removeHashtags && modifiedPost.text) {
+              modifiedPost.text = this.removeHashtags(modifiedPost.text);
+            }
+            
+            // Применяем транслитерацию, если включена
+            if (task.publishOptions.transliterate && modifiedPost.text) {
+              modifiedPost.text = this.transliterateText(modifiedPost.text);
+            }
+            
+            // Применяем настройки кастомизации поста
+            if (task.postCustomization) {
+              // Добавляем текст в начало или конец поста
+              if (task.postCustomization.addText?.enabled && task.postCustomization.addText?.text) {
+                if (task.postCustomization.addText.position === 'before') {
+                  modifiedPost.text = `${task.postCustomization.addText.text}\n\n${modifiedPost.text || ''}`;
+                } else {
+                  modifiedPost.text = `${modifiedPost.text || ''}\n\n${task.postCustomization.addText.text}`;
+                }
               }
               
-              // Транслитерируем текст, если включена соответствующая опция
-              if (task.publishOptions.transliterate) {
-                modifiedPost.text = this.transliterateText(modifiedPost.text);
+              // Добавляем хэштеги в конец поста
+              if (task.postCustomization.addHashtags?.enabled && task.postCustomization.addHashtags?.hashtags) {
+                const hashtags = task.postCustomization.addHashtags.hashtags
+                  .split(/[\s,]+/)
+                  .filter(tag => tag.length > 0)
+                  .map(tag => tag.startsWith('#') ? tag : `#${tag}`)
+                  .join(' ');
+                
+                modifiedPost.text = `${modifiedPost.text || ''}\n\n${hashtags}`;
               }
               
-              // Заменяем объект поста на модифицированный
-              post.text = modifiedPost.text;
+              // Добавляем ссылку на источник
+              if (task.postCustomization.addSourceLink?.enabled && post.postUrl) {
+                const sourcePrefix = task.postCustomization.addSourceLink.text || 'Источник: ';
+                modifiedPost.text = `${modifiedPost.text || ''}\n\n${sourcePrefix}${post.postUrl}`;
+              }
+              
+              // Добавляем подпись в конец поста
+              if (task.postCustomization.addSignature?.enabled && task.postCustomization.addSignature?.text) {
+                modifiedPost.text = `${modifiedPost.text || ''}\n\n${task.postCustomization.addSignature.text}`;
+              }
+              
+              // Добавляем изображение, если указано
+              if (task.postCustomization.addImage?.enabled && task.postCustomization.addImage?.imageUrl) {
+                modifiedPost.attachments = modifiedPost.attachments || [];
+                modifiedPost.attachments.push({
+                  type: 'photo',
+                  url: task.postCustomization.addImage.imageUrl
+                });
+              }
+            }
+            
+            // Применяем измененный текст к оригинальному посту
+            post.text = modifiedPost.text;
+            if (modifiedPost.attachments) {
+              post.attachments = modifiedPost.attachments;
             }
             
             // Публикуем пост в целевую группу
