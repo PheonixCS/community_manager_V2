@@ -228,8 +228,8 @@ const VkAuthManager = () => {
             Как авторизоваться
           </Typography>
           <Typography variant="body1" paragraph>
-            Для публикации постов необходим активный токен пользователя ВКонтакте с правильными разрешениями.
-            <strong> Необходимо разрешить все запрашиваемые права доступа!</strong>
+            Для публикации постов необходим активный токен пользователя ВКонтакте с <strong>правильными разрешениями</strong>.
+            <strong> Необходимо разрешить ВСЕ запрашиваемые права доступа!</strong>
           </Typography>
           <Typography variant="body1" paragraph>
             1. Нажмите кнопку "Новая авторизация"
@@ -240,6 +240,15 @@ const VkAuthManager = () => {
           <Typography variant="body1" paragraph>
             3. Если вы ранее отказали в каких-то правах, необходимо удалить токен и авторизоваться заново
           </Typography>
+          <Typography variant="body2" paragraph color="primary" sx={{ fontWeight: 'bold', mt: 2 }}>
+            Критически важные разрешения для публикации в сообществах:
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+            <Chip label="wall (стена)" color="success" variant="outlined" />
+            <Chip label="manage (управление сообществом)" color="success" variant="outlined" />
+            <Chip label="photos (фотографии)" color="success" variant="outlined" />
+            <Chip label="groups (сообщества)" color="success" variant="outlined" />
+          </Box>
           <Typography variant="body2" paragraph sx={{ fontStyle: 'italic', mt: 2 }}>
             Запрашиваемые разрешения: доступ к стене, фотографиям, видео, документам, управлению сообществами
           </Typography>
@@ -248,11 +257,11 @@ const VkAuthManager = () => {
               У вас нет активных токенов. Без токена публикация постов невозможна!
             </Alert>
           )}
-          {tokens.some(token => token.isActive && (!token.scope.includes('wall') || !token.scope.includes('photos') || !token.scope.includes('groups'))) && (
+          {tokens.some(token => token.isActive && (!token.scope.includes('wall') || !token.scope.includes('photos') || !token.scope.includes('groups') || !token.scope.includes('manage'))) && (
             <Alert severity="error" sx={{ mt: 2 }}>
               <Typography variant="subtitle2">Обнаружен токен с недостаточными правами!</Typography>
               <Typography variant="body2">
-                Для работы публикации необходимы права: wall, photos, groups. Пожалуйста, удалите текущий токен и авторизуйтесь заново.
+                Для работы публикации в сообществах необходимы права: wall, photos, groups, manage. Пожалуйста, удалите текущий токен и авторизуйтесь заново.
               </Typography>
             </Alert>
           )}

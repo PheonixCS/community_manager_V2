@@ -10,13 +10,20 @@ const config = require('../config/config');
  * Сервис для публикации постов в сообщества ВКонтакте
  */
 class VkPostingService {
+  constructor() {
+    // Queue for rate limiting photo uploads
+    this.photoUploadQueue = [];
+    this.isProcessingQueue = false;
+    this.uploadDelay = 1000; // 1 second delay between photo uploads
+  }
+
   /**
    * Получить токен публикации для постинга
    * @returns {Promise<string|null>} Токен публикации или null
    */
   async getPublishToken() {
     try {
-      // Update required permissions list to match our auth request
+      // Make sure our required permissions list includes manage and groups (needed for wall posting)
       const requiredScopes = ['wall', 'photos', 'groups', 'manage'];
       console.log(`Looking for token with these scopes: ${requiredScopes.join(', ')}`);
       
@@ -30,15 +37,15 @@ class VkPostingService {
       
       console.log(`Found ${activeTokens.length} active tokens`);
       
-      // Modified approach - be more permissive with required scopes
-      // We'll accept any token that has at least wall rights - the most essential scope
+      // We need a token with wall, photos, groups and manage permissions
+      // For posting to community walls, we need wall + manage permission
       for (const token of activeTokens) {
         const tokenScopes = token.scope || [];
         console.log(`Token ${token.vkUserId} has scopes: ${tokenScopes.join(', ')}`);
         
-        // If token has wall rights, use it right away
-        if (tokenScopes.includes('wall')) {
-          console.log(`Found token with wall access rights: ${token.vkUserId}`);
+        // Check specifically if token has wall AND manage rights for posting to community walls
+        if (tokenScopes.includes('wall') && tokenScopes.includes('manage')) {
+          console.log(`Found token with wall+manage access rights: ${token.vkUserId}`);
           
           // Update last used date
           token.lastUsed = new Date();
@@ -48,12 +55,62 @@ class VkPostingService {
         }
       }
       
-      // If we get here, no token had wall rights
-      throw new Error('Ни один из активных токенов не имеет прав доступа к стене (wall). Пожалуйста, удалите текущий токен и выполните авторизацию заново, предоставив все запрашиваемые разрешения.');
+      // If we get here, no token had the proper rights
+      throw new Error('Не найден токен с правами на публикацию в сообществах (необходимы права "wall" и "manage"). Пожалуйста, удалите текущий токен и выполните авторизацию заново, предоставив все запрашиваемые разрешения.');
     } catch (error) {
       console.error('Error getting VK publish token:', error);
       throw error;
     }
+  }
+
+  /**
+   * Queue photo upload with rate limiting
+   * @param {string} photoUrl - URL of the photo
+   * @param {string} token - Access token
+   * @param {string} communityId - Community ID
+   * @returns {Promise<string|null>} Photo attachment string or null
+   */
+  queuePhotoUpload(photoUrl, token, communityId) {
+    return new Promise((resolve, reject) => {
+      this.photoUploadQueue.push({
+        photoUrl,
+        token,
+        communityId,
+        resolve,
+        reject
+      });
+      
+      // Start processing the queue if not already processing
+      if (!this.isProcessingQueue) {
+        this.processPhotoUploadQueue();
+      }
+    });
+  }
+
+  /**
+   * Process the photo upload queue with rate limiting
+   */
+  async processPhotoUploadQueue() {
+    if (this.photoUploadQueue.length === 0) {
+      this.isProcessingQueue = false;
+      return;
+    }
+    
+    this.isProcessingQueue = true;
+    const { photoUrl, token, communityId, resolve, reject } = this.photoUploadQueue.shift();
+    
+    try {
+      // Try to upload the photo with retries
+      const result = await this.uploadPhotoToVkWithRetry(photoUrl, token, communityId);
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    }
+    
+    // Wait before processing next item
+    setTimeout(() => {
+      this.processPhotoUploadQueue();
+    }, this.uploadDelay);
   }
 
   /**
@@ -197,7 +254,7 @@ class VkPostingService {
       try {
         if (attachment.type === 'photo') {
           // Загружаем фото на сервер ВК
-          const photoAttachment = await this.uploadPhotoToVk(
+          const photoAttachment = await this.queuePhotoUpload(
             attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[0]?.url,
             token,
             communityId
@@ -226,6 +283,45 @@ class VkPostingService {
     }
     
     return attachmentStrings.join(',');
+  }
+
+  /**
+   * Upload photo to VK with retry mechanism
+   * @param {string} photoUrl - Photo URL
+   * @param {string} token - Access token
+   * @param {string} communityId - Community ID
+   * @returns {Promise<string|null>} Photo attachment string or null
+   */
+  async uploadPhotoToVkWithRetry(photoUrl, token, communityId, retryCount = 3, retryDelay = 2000) {
+    let lastError = null;
+    
+    for (let attempt = 0; attempt < retryCount; attempt++) {
+      try {
+        return await this.uploadPhotoToVk(photoUrl, token, communityId);
+      } catch (error) {
+        lastError = error;
+        console.log(`Photo upload attempt ${attempt + 1}/${retryCount} failed: ${error.message}`);
+        
+        // Check if we should retry based on error type
+        const shouldRetry = error.message.includes('Too many requests per second') ||
+                            error.message.includes('Internal server error') ||
+                            error.response?.status === 500;
+        
+        if (!shouldRetry) {
+          console.log(`Error doesn't seem retryable, breaking retry loop`);
+          break;
+        }
+        
+        // Wait before next attempt - use exponential backoff
+        const waitTime = retryDelay * Math.pow(2, attempt);
+        console.log(`Waiting ${waitTime}ms before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+    
+    console.error(`Failed to upload photo after ${retryCount} attempts`, lastError);
+    // Return null to indicate failure
+    return null;
   }
 
   /**
@@ -316,7 +412,7 @@ class VkPostingService {
         console.error('Response status:', error.response.status);
       }
       
-      return null;
+      throw error;
     }
   }
 
@@ -374,6 +470,12 @@ class VkPostingService {
         has_attachments: !!postData.attachments
       });
       
+      // Check if message is very long and truncate temporarily to log
+      if (postData.message && postData.message.length > 1000) {
+        console.log(`Message length is ${postData.message.length} characters (first 100 characters):`);
+        console.log(postData.message.substring(0, 100) + '...');
+      }
+      
       // Instead of passing everything as URL parameters, create form data for the body
       const formData = new URLSearchParams();
       
@@ -399,9 +501,16 @@ class VkPostingService {
         console.error('VK API returned an error:', response.data.error);
         
         // Special handling for permission errors
-        if (response.data.error.error_code === 15 || 
-            (response.data.error.error_msg && response.data.error.error_msg.includes('access'))) {
-          throw new Error(`Недостаточно прав для публикации поста. Необходимо повторно авторизоваться в ВКонтакте с правами на публикацию в группы. Ошибка API: ${response.data.error.error_msg}`);
+        if (response.data.error.error_code === 15) {
+          // Error 15 is insufficient permissions
+          let errorMsg = 'Недостаточно прав для публикации поста.';
+          
+          // Check specific error subcodes
+          if (response.data.error.error_subcode === 1133) {
+            errorMsg = 'Отсутствуют права manage для публикации в сообществах. Необходимо повторно авторизоваться в ВКонтакте, предоставив все запрашиваемые разрешения.';
+          }
+          
+          throw new Error(`${errorMsg} Ошибка API: ${response.data.error.error_msg}`);
         }
         
         throw new Error(`VK API Error: ${response.data.error.error_msg}`);
@@ -413,8 +522,10 @@ class VkPostingService {
       console.error('Error making wall.post request:', error);
       
       // Enhance error message for permission issues
-      if (error.message.includes('Access denied') || error.message.includes('permission')) {
-        throw new Error('Недостаточно прав для публикации. Пожалуйста, удалите текущий токен и выполните авторизацию ВКонтакте заново, предоставив все запрашиваемые разрешения.');
+      if (error.message.includes('Access denied') || 
+          error.message.includes('permission') || 
+          error.message.includes('access')) {
+        throw new Error('Недостаточно прав для публикации. Пожалуйста, удалите текущий токен и выполните авторизацию ВКонтакте заново, предоставив все запрашиваемые разрешения (особенно "Управление сообществом" и "Доступ к стене").');
       }
       
       throw error;

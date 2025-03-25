@@ -163,7 +163,7 @@ class VkAuthService {
       
       // Важное изменение: поскольку VK API не всегда возвращает scope в ответе,
       // мы задаем его явно теми правами, которые запросили
-      const requestedScopes = ["wall", "photos", "groups", "video", "offline", "pages", "docs", "manage"];
+      const requestedScopes = ["wall", "photos", "groups", "video", "offline", "stats", "docs"];
       
       // Создаем или обновляем запись с токеном
       const tokenData = {
@@ -172,7 +172,7 @@ class VkAuthService {
         accessToken: response.data.access_token,
         refreshToken: response.data.refresh_token,
         expiresAt: Math.floor(Date.now() / 1000) + (response.data.expires_in || 86400), // По умолчанию 24 часа
-        scope: requestedScopes, // Используем запрошенные права вместо тех, что возвращает API
+        scope: response.scope, // Используем запрошенные права вместо тех, что возвращает API
         isActive: true,
         lastUsed: new Date(),
         userInfo: userInfo
@@ -319,6 +319,14 @@ class VkAuthService {
       // Выводим для отладки, какие разрешения мы ищем
       console.log(`Looking for token with scopes: ${scopeArray.join(',')}`);
       
+      // Check specifically for critical permissions
+      const criticalPermissions = ['wall', 'photos', 'groups', 'video', 'offline', 'docs'];
+      const needsCriticalPermissions = scopeArray.some(scope => criticalPermissions.includes(scope));
+      
+      if (needsCriticalPermissions) {
+        console.log('This request needs critical posting permissions. Checking tokens carefully.');
+      }
+      
       // Более гибкий поиск токена: находим активные токены
       const activeTokens = await VkUserToken.find({ 
         isActive: true,
@@ -329,6 +337,27 @@ class VkAuthService {
       
       if (activeTokens.length === 0) {
         return null;
+      }
+      
+      // For wall posting, we specifically need wall + manage permissions
+      if (scopeArray.includes('wall') && scopeArray.includes('manage')) {
+        // Find tokens that have both wall and manage permissions
+        const wallAndManageTokens = activeTokens.filter(token => {
+          return token.scope && 
+                 token.scope.includes('wall') && 
+                 token.scope.includes('manage');
+        });
+        
+        if (wallAndManageTokens.length > 0) {
+          console.log(`Found ${wallAndManageTokens.length} tokens with both wall and manage permissions`);
+          // Use the first valid token
+          const token = wallAndManageTokens[0];
+          token.lastUsed = new Date();
+          await token.save();
+          return token;
+        } else {
+          console.log('No tokens found with both wall and manage permissions - critical for posting to communities');
+        }
       }
       
       // Проверяем наличие необходимых разрешений - более лояльно
@@ -363,6 +392,14 @@ class VkAuthService {
       // Если нашли токен хотя бы с одним разрешением - используем его
       if (bestToken) {
         console.log(`Using token with partial scope match (${bestScopeMatch}/${scopeArray.length}): ${bestToken.vkUserId}`);
+        
+        // Add a warning if we're missing critical permissions
+        if (needsCriticalPermissions && 
+            bestScopeMatch < scopeArray.length) {
+          console.warn(`WARNING: Token is missing some critical permissions: ${
+            scopeArray.filter(scope => !bestToken.scope.includes(scope)).join(', ')
+          }`);
+        }
         
         // Обновляем дату использования
         bestToken.lastUsed = new Date();

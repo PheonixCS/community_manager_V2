@@ -207,7 +207,43 @@ router.post('/publish-post', async (req, res) => {
       formattedCommunityId = `-${communityId}`;
     }
     
+    // Validate community ID format (must be numeric after - sign)
+    if (!/^-\d+$/.test(formattedCommunityId)) {
+      return res.status(400).json({
+        status: 'error',
+        error: 'Invalid community ID format. Must be a negative number (e.g., -123456)'
+      });
+    }
+    
     const vkPostingService = require('../../services/vkPostingService');
+    
+    // Verify token permissions first
+    try {
+      const vkAuthService = require('../../services/vkAuthService');
+      const token = await vkAuthService.getActiveToken(['wall', 'photos', 'groups', 'manage']);
+      
+      if (!token) {
+        return res.status(401).json({
+          status: 'error',
+          error: 'Не найден активный токен ВКонтакте. Пожалуйста, авторизуйтесь в разделе "Авторизация ВКонтакте".'
+        });
+      }
+      
+      // Check token has the critical permissions
+      const hasWall = token.scope && token.scope.includes('wall');
+      const hasManage = token.scope && token.scope.includes('manage');
+      
+      if (!hasWall || !hasManage) {
+        return res.status(401).json({
+          status: 'error',
+          error: `Токен не имеет необходимых прав. ${!hasWall ? 'Отсутствует право "wall". ' : ''}${!hasManage ? 'Отсутствует право "manage". ' : ''}Пожалуйста, удалите этот токен и авторизуйтесь заново, предоставив все запрашиваемые разрешения.`
+        });
+      }
+      
+    } catch (tokenError) {
+      console.error('Error checking token permissions:', tokenError);
+      // Continue and let the posting service handle token errors
+    }
     
     try {
       const result = await vkPostingService.publishExistingPost(
@@ -243,27 +279,26 @@ router.post('/publish-post', async (req, res) => {
       
       res.json(result);
     } catch (vkError) {
-      // Проверяем, есть ли активные токены и даем соответствующую подсказку
+      // More detailed error handling
       let errorMessage = vkError.message;
+      let errorDetails = '';
       
-      // Проверяем наличие активных токенов, если ошибка связана с авторизацией
-      if (errorMessage.includes('токен') || errorMessage.includes('авторизоваться')) {
-        try {
-          const vkAuthService = require('../../services/vkAuthService');
-          const tokens = await vkAuthService.getAllTokens();
-          const hasActiveTokens = tokens.some(token => token.isActive);
-          
-          if (!hasActiveTokens) {
-            errorMessage = 'Для публикации постов необходимо авторизоваться в ВКонтакте. Перейдите в раздел "Авторизация ВКонтакте".';
-          }
-        } catch (tokenError) {
-          console.error('Error checking tokens:', tokenError);
-        }
+      // Check for specific error types and provide more helpful messages
+      if (errorMessage.includes('Too many requests per second')) {
+        errorMessage = 'Слишком много запросов к API ВКонтакте. Пожалуйста, подождите и попробуйте снова.';
+        errorDetails = 'Возможно, требуется уменьшить количество вложений или публиковать реже.';
+      } else if (errorMessage.includes('no access to call this method')) {
+        errorMessage = 'Отсутствуют необходимые права для публикации в сообщество.';
+        errorDetails = 'Требуются права "Управление сообществом" и "Доступ к стене". Удалите текущий токен и авторизуйтесь заново.';
+      } else if (errorMessage.includes('community access denied')) {
+        errorMessage = 'Доступ к сообществу запрещен.';
+        errorDetails = 'Возможно, вы не являетесь администратором этого сообщества или сообщество закрыто.';
       }
       
       return res.status(400).json({
         status: 'error',
-        error: errorMessage
+        error: errorMessage,
+        details: errorDetails || vkError.message
       });
     }
   } catch (error) {

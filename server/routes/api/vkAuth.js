@@ -54,7 +54,7 @@ router.get('/callback', async (req, res) => {
       status: 'success',
       message: 'Authorization successful',
       user: result.user,
-      scope: result.token.scope
+      scope: result.token
     });
   } catch (error) {
     console.error('Error processing auth callback:', error);

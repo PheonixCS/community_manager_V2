@@ -165,25 +165,101 @@ class PublishTaskService {
     
     if (bestPosts.length === 0) {
       console.log('No suitable posts found for publishing');
+      // Save this fact in history for better reporting
+      try {
+        await publishTaskRepository.savePublishHistory({
+          sourcePostId: 'no_posts',
+          postId: null,
+          sourceGroupId: 'n/a',
+          targetGroupId: task.targetGroups.length > 0 ? task.targetGroups[0].groupId : 'no_target',
+          publishedAt: new Date(),
+          publishTaskId: task._id,
+          status: 'failed',
+          targetPostId: 'no_suitable_posts',
+          errorMessage: 'Не найдены подходящие посты для публикации'
+        });
+      } catch (historyError) {
+        console.error('Failed to save no-posts history:', historyError);
+      }
       return;
+    }
+    
+    // Check tokens before attempting to publish to avoid multiple failures
+    try {
+      const vkAuthService = require('./vkAuthService');
+      const tokens = await vkAuthService.getAllTokens();
+      const activeTokens = tokens.filter(t => t.isActive && !t.isExpired());
+      
+      if (activeTokens.length === 0) {
+        const errorMessage = 'Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".';
+        console.error(errorMessage);
+        
+        // Save error in history
+        for (const targetGroup of task.targetGroups) {
+          try {
+            await publishTaskRepository.savePublishHistory({
+              sourcePostId: bestPosts[0]?.postId || 'unknown',
+              postId: bestPosts[0]?._id || null,
+              sourceGroupId: bestPosts[0]?.communityId || 'unknown',
+              targetGroupId: targetGroup.groupId,
+              publishedAt: new Date(),
+              publishTaskId: task._id,
+              status: 'failed',
+              targetPostId: 'no_tokens',
+              errorMessage: errorMessage
+            });
+          } catch (histErr) {
+            console.error('Failed to save error history:', histErr);
+          }
+        }
+        
+        result.failed += task.targetGroups.length;
+        return;
+      }
+      
+      // Check if token has proper permissions
+      const hasProperToken = activeTokens.some(t => 
+        t.scope && t.scope.includes('wall') && t.scope.includes('manage')
+      );
+      
+      if (!hasProperToken) {
+        const errorMessage = 'Отсутствуют необходимые права для публикации (wall+manage). Удалите токен и авторизуйтесь заново.';
+        console.error(errorMessage);
+        
+        // Save error in history
+        for (const targetGroup of task.targetGroups) {
+          try {
+            await publishTaskRepository.savePublishHistory({
+              sourcePostId: bestPosts[0]?.postId || 'unknown',
+              postId: bestPosts[0]?._id || null,
+              sourceGroupId: bestPosts[0]?.communityId || 'unknown',
+              targetGroupId: targetGroup.groupId,
+              publishedAt: new Date(),
+              publishTaskId: task._id,
+              status: 'failed',
+              targetPostId: 'insufficient_permissions',
+              errorMessage: errorMessage
+            });
+          } catch (histErr) {
+            console.error('Failed to save error history:', histErr);
+          }
+        }
+        
+        result.failed += task.targetGroups.length;
+        return;
+      }
+    } catch (tokenCheckError) {
+      console.error('Error checking tokens:', tokenCheckError);
+      // Continue and let the posting attempt handle specific errors
     }
     
     // Для каждой целевой группы публикуем лучшие посты
     for (const targetGroup of task.targetGroups) {
       for (const post of bestPosts) {
         try {
-          // 1. Проверяем наличие активных токенов перед публикацией
-          const vkAuthService = require('./vkAuthService');
-          const tokens = await vkAuthService.getAllTokens();
-          const activeTokens = tokens.filter(t => t.isActive);
+          console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens?.length || 'unknown'} active tokens`);
           
-          if (activeTokens.length === 0) {
-            throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
-          }
-          
-          console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens.length} active tokens`);
-          
-          // 2. Публикуем пост в целевую группу
+          // Публикуем пост в целевую группу
           const publishResult = await vkPostingService.publishExistingPost(
             post._id.toString(),
             targetGroup.groupId,
