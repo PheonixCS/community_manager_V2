@@ -19,15 +19,16 @@ class VkAuthService {
       throw new Error('VK App ID not configured');
     }
     
+    // Make sure we request ALL necessary permissions for posting
     const scope = [
-      'wall',       // Доступ к стене
-      'groups',     // Доступ к сообществам
-      'photos',     // Доступ к фотографиям
+      'wall',       // Доступ к стене (для публикации)
+      'photos',     // Доступ к фотографиям (загрузка фото)
+      'groups',     // Доступ к сообществам (публикация в группы)
       'video',      // Доступ к видео
       'offline'     // Получение refresh token для бессрочного использования
     ].join(',');
     
-    // Log the redirect URI for debugging purposes
+    console.log(`Creating VK auth URL with scopes: ${scope}`);
     console.log('Using redirect URI for authorization:', redirectUri);
     
     return `https://oauth.vk.com/authorize?client_id=${vkAppId}&display=page&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&v=5.131`;

@@ -215,17 +215,17 @@ const VkAuthManager = () => {
             Как авторизоваться
           </Typography>
           <Typography variant="body1" paragraph>
-            Для публикации постов необходим активный токен пользователя ВКонтакте.
-            <strong> Публикация через сервисный токен невозможна!</strong>
+            Для публикации постов необходим активный токен пользователя ВКонтакте с правильными разрешениями.
+            <strong> Токен должен иметь разрешения: wall, photos, groups!</strong>
           </Typography>
           <Typography variant="body1" paragraph>
             1. Нажмите кнопку "Новая авторизация"
           </Typography>
           <Typography variant="body1" paragraph>
-            2. В открывшемся окне разрешите доступ приложению к вашему аккаунту ВКонтакте
+            2. В открывшемся окне <strong>обязательно разрешите ВСЕ запрашиваемые права</strong> приложению к вашему аккаунту ВКонтакте
           </Typography>
           <Typography variant="body1" paragraph>
-            3. После успешной авторизации вернитесь на эту страницу и обновите список токенов
+            3. Если вы ранее отказали в каких-то правах, необходимо удалить текущий токен и авторизоваться заново
           </Typography>
           <Typography variant="body1">
             Токен будет автоматически обновляться системой, пока у приложения есть доступ к вашему аккаунту.
@@ -233,6 +233,14 @@ const VkAuthManager = () => {
           {tokens.length === 0 && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               У вас нет активных токенов. Без токена публикация постов невозможна!
+            </Alert>
+          )}
+          {tokens.some(token => token.isActive && (!token.scope.includes('wall') || !token.scope.includes('photos') || !token.scope.includes('groups'))) && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <Typography variant="subtitle2">Обнаружен токен с недостаточными правами!</Typography>
+              <Typography variant="body2">
+                Для работы публикации необходимы права: wall, photos, groups. Пожалуйста, удалите текущий токен и авторизуйтесь заново.
+              </Typography>
             </Alert>
           )}
         </CardContent>
@@ -309,20 +317,34 @@ const VkAuthManager = () => {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {token.scope.slice(0, 3).map((scope, index) => (
+                            {token.scope.slice(0, 5).map((scope, index) => (
                               <Chip
                                 key={index}
                                 label={scope}
                                 size="small"
                                 variant="outlined"
+                                color={
+                                  ['wall', 'photos', 'groups'].includes(scope) 
+                                    ? 'success' 
+                                    : 'default'
+                                }
                               />
                             ))}
-                            {token.scope.length > 3 && (
+                            {token.scope.length > 5 && (
                               <Chip
-                                label={`+${token.scope.length - 3}`}
+                                label={`+${token.scope.length - 5}`}
                                 size="small"
                                 variant="outlined"
                               />
+                            )}
+                            {['wall', 'photos', 'groups'].some(required => !token.scope.includes(required)) && (
+                              <Tooltip title="Отсутствуют необходимые права для публикации">
+                                <Chip
+                                  label="Недостаточно прав"
+                                  size="small"
+                                  color="error"
+                                />
+                              </Tooltip>
                             )}
                           </Box>
                         </TableCell>

@@ -16,45 +16,64 @@ class VkPostingService {
    */
   async getPublishToken() {
     try {
-      // Сначала пытаемся получить пользовательский токен с нужными правами
-      const requiredScope = ['wall', 'groups'];
+      // Required permissions for posting to wall
+      const requiredScopes = ['wall', 'photos', 'groups'];
+      console.log(`Looking for token with all of these scopes: ${requiredScopes.join(', ')}`);
       
-      // 1. Пробуем сначала найти любой активный токен
-      let userToken = await vkAuthService.getActiveToken(requiredScope);
-      
-      if (!userToken) {
-        console.log('No token with both wall and groups scope found, trying with just wall scope...');
-        // 2. Если не найден с обоими разрешениями, пробуем хотя бы с wall
-        userToken = await vkAuthService.getActiveToken(['wall']);
-      }
-      
-      if (userToken) {
-        console.log(`Using VK user token for user ${userToken.vkUserName} (${userToken.vkUserId}), scope: ${userToken.scope.join(',')}`);
-        return userToken.accessToken;
-      }
-      
-      // 3. Пробуем получить все токены и посмотреть, в чем проблема
+      // Get all active tokens first
       const allTokens = await vkAuthService.getAllTokens();
-      if (allTokens && allTokens.length > 0) {
-        const activeTokens = allTokens.filter(t => t.isActive);
-        
-        if (activeTokens.length > 0) {
-          console.log(`Found ${activeTokens.length} active tokens but none with required scopes. Using first available token.`);
-          console.log(`Token scopes available: ${activeTokens[0].scope.join(',')}`);
-          // Используем первый активный токен, даже если у него нет всех нужных прав
-          return activeTokens[0].accessToken;
-        } else {
-          console.log(`Found ${allTokens.length} tokens but none are active`);
-        }
-      } else {
-        console.log('No VK user tokens found in database');
+      const activeTokens = allTokens.filter(t => t.isActive && !t.isExpired());
+      
+      if (activeTokens.length === 0) {
+        throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
       }
       
-      // Если дошли до этой точки, значит пользовательский токен не найден
-      throw new Error('Не найден активный пользовательский токен ВКонтакте. Необходимо авторизоваться в ВКонтакте через раздел "Авторизация ВКонтакте".');
+      console.log(`Found ${activeTokens.length} active tokens`);
+      
+      // Check permissions on each token and find the best match
+      let bestToken = null;
+      let bestMatchCount = 0;
+      
+      for (const token of activeTokens) {
+        const tokenScopes = token.scope || [];
+        console.log(`Token ${token.vkUserId} has scopes: ${tokenScopes.join(', ')}`);
+        
+        const matchedScopes = requiredScopes.filter(scope => tokenScopes.includes(scope));
+        
+        if (matchedScopes.length > bestMatchCount) {
+          bestMatchCount = matchedScopes.length;
+          bestToken = token;
+          
+          if (matchedScopes.length === requiredScopes.length) {
+            // Found a perfect match
+            console.log(`Found perfect token match with ID ${token.vkUserId}`);
+            break;
+          }
+        }
+      }
+      
+      if (bestToken) {
+        console.log(`Using best token match (${bestMatchCount}/${requiredScopes.length} scopes matched) for user ${bestToken.vkUserName} (${bestToken.vkUserId})`);
+        
+        // Update last used date
+        bestToken.lastUsed = new Date();
+        await bestToken.save();
+        
+        // Warn if the token doesn't have all required permissions
+        if (bestMatchCount < requiredScopes.length) {
+          const missingScopes = requiredScopes.filter(scope => !bestToken.scope.includes(scope));
+          console.warn(`Warning: Token is missing required scopes: ${missingScopes.join(', ')}`);
+          console.warn('Some operations may fail due to insufficient permissions');
+        }
+        
+        return bestToken.accessToken;
+      }
+      
+      // If we get here, no token had any of the required scopes
+      throw new Error('Ни один из активных токенов не имеет необходимых разрешений (wall, photos, groups). Пожалуйста, удалите текущий токен и выполните авторизацию заново.');
     } catch (error) {
       console.error('Error getting VK publish token:', error);
-      throw error; // Пробрасываем ошибку дальше, чтобы показать пользователю
+      throw error;
     }
   }
 
@@ -243,6 +262,8 @@ class VkPostingService {
         throw new Error('Photo URL is required');
       }
       
+      console.log(`Attempting to upload photo from URL: ${photoUrl} to group ${communityId}`);
+      
       // 1. Получаем сервер для загрузки фото
       const uploadServerResponse = await axios.get('https://api.vk.com/method/photos.getWallUploadServer', {
         params: {
@@ -256,20 +277,37 @@ class VkPostingService {
         throw new Error(`VK API Error: ${uploadServerResponse.data.error.error_msg}`);
       }
       
+      console.log(`Got upload server: ${uploadServerResponse.data.response.upload_url}`);
       const uploadUrl = uploadServerResponse.data.response.upload_url;
       
-      // 2. Скачиваем фото и загружаем на сервер ВК
-      const photoResponse = await axios.get(photoUrl, { responseType: 'arraybuffer' });
-      const formData = new FormData();
-      formData.append('photo', new Blob([photoResponse.data]), 'photo.jpg');
-      
-      const uploadResponse = await axios.post(uploadUrl, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      // 2. Скачиваем фото
+      const photoResponse = await axios.get(photoUrl, { 
+        responseType: 'arraybuffer',
+        timeout: 30000 // Increase timeout for potentially slow image servers
       });
       
-      // 3. Сохраняем фото на стену
+      // 3. Create proper FormData instance with binary data
+      const FormData = require('form-data');
+      const formData = new FormData();
+      formData.append('photo', Buffer.from(photoResponse.data), {
+        filename: 'photo.jpg',
+        contentType: 'image/jpeg'
+      });
+      
+      // 4. Загружаем на сервер ВК
+      const uploadResponse = await axios.post(uploadUrl, formData, {
+        headers: formData.getHeaders(),
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      });
+      
+      if (!uploadResponse.data || uploadResponse.data.error) {
+        throw new Error(`VK Upload Error: ${uploadResponse.data?.error || 'Unknown upload error'}`);
+      }
+      
+      console.log('Successfully uploaded photo to VK server');
+      
+      // 5. Сохраняем фото на стену
       const saveResponse = await axios.get('https://api.vk.com/method/photos.saveWallPhoto', {
         params: {
           group_id: communityId.replace('-', ''),
@@ -286,10 +324,19 @@ class VkPostingService {
       }
       
       const savedPhoto = saveResponse.data.response[0];
+      console.log(`Successfully saved photo with ID: ${savedPhoto.id}`);
+      
       return `photo${savedPhoto.owner_id}_${savedPhoto.id}`;
       
     } catch (error) {
       console.error('Error uploading photo to VK:', error);
+      
+      // Enhanced error logging
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+      }
+      
       return null;
     }
   }
@@ -342,6 +389,12 @@ class VkPostingService {
    */
   async makeWallPostRequest(postData, token) {
     try {
+      console.log('Attempting wall.post request with data:', {
+        owner_id: postData.owner_id,
+        message_preview: postData.message ? postData.message.substring(0, 30) + '...' : '(no text)',
+        has_attachments: !!postData.attachments
+      });
+      
       const response = await axios.post('https://api.vk.com/method/wall.post', null, {
         params: {
           ...postData,
@@ -351,12 +404,27 @@ class VkPostingService {
       });
       
       if (response.data.error) {
+        console.error('VK API returned an error:', response.data.error);
+        
+        // Special handling for permission errors
+        if (response.data.error.error_code === 15 || 
+            (response.data.error.error_msg && response.data.error.error_msg.includes('access'))) {
+          throw new Error(`Недостаточно прав для публикации поста. Необходимо повторно авторизоваться в ВКонтакте с правами на публикацию в группы. Ошибка API: ${response.data.error.error_msg}`);
+        }
+        
         throw new Error(`VK API Error: ${response.data.error.error_msg}`);
       }
       
+      console.log('Successfully posted to wall, post ID:', response.data.response.post_id);
       return response.data.response;
     } catch (error) {
       console.error('Error making wall.post request:', error);
+      
+      // Enhance error message for permission issues
+      if (error.message.includes('Access denied') || error.message.includes('permission')) {
+        throw new Error('Недостаточно прав для публикации. Пожалуйста, удалите текущий токен и выполните авторизацию ВКонтакте заново, предоставив все запрашиваемые разрешения.');
+      }
+      
       throw error;
     }
   }
