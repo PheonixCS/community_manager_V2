@@ -54,6 +54,18 @@ const VkAuthManager = () => {
     }
   };
 
+  // Add the missing fetchAuthUrl function
+  const fetchAuthUrl = async () => {
+    try {
+      const response = await axios.get('/api/vk-auth/auth-url');
+      setAuthUrl(response.data.authUrl);
+      console.log('Fetched initial VK auth URL for button activation');
+    } catch (error) {
+      console.error('Error fetching auth URL:', error);
+      showSnackbar('Ошибка при получении URL авторизации', 'error');
+    }
+  };
+
   const handleDeleteToken = async () => {
     try {
       await axios.delete(`/api/vk-auth/tokens/${tokenToDelete}`);
