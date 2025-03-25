@@ -29,6 +29,7 @@ const VkAuthManager = () => {
     severity: 'info'
   });
   const [tokenActions, setTokenActions] = useState({});
+  const [pkceError, setPkceError] = useState(null);
 
   useEffect(() => {
     const initData = async () => {
@@ -168,6 +169,9 @@ const VkAuthManager = () => {
       return;
     }
     
+    // Clear previous auth errors if any
+    setPkceError(null);
+    
     // Показываем важное предупреждение пользователю
     showSnackbar('ВАЖНО! Необходимо разрешить ВСЕ запрашиваемые права доступа для корректной работы приложения!', 'warning');
     
@@ -207,7 +211,12 @@ const VkAuthManager = () => {
               showSnackbar('Авторизация успешно выполнена! Все необходимые разрешения получены.', 'success');
             }
           } else {
-            showSnackbar('Не удалось получить токен. Попробуйте авторизоваться снова.', 'error');
+            // Check if we had a PKCE error
+            if (pkceError) {
+              showSnackbar(`Ошибка авторизации: ${pkceError}. Попробуйте очистить cookies и кэш браузера.`, 'error');
+            } else {
+              showSnackbar('Не удалось получить токен. Попробуйте авторизоваться снова.', 'error');
+            }
           }
         });
       }
@@ -221,6 +230,16 @@ const VkAuthManager = () => {
       }
       showSnackbar('Время авторизации истекло. Попробуйте снова.', 'error');
     }, 300000); // 5 minutes timeout
+    
+    // Listen for error messages from the auth window
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'vk-auth-error') {
+        setPkceError(event.data.message);
+        if (authWindow && !authWindow.closed) {
+          authWindow.close();
+        }
+      }
+    }, false);
   };
 
   return (
@@ -301,6 +320,16 @@ const VkAuthManager = () => {
               <Typography variant="subtitle2">Обнаружен токен с недостаточными правами!</Typography>
               <Typography variant="body2">
                 Для работы публикации в сообществах необходимы права: wall, photos, groups, manage. Пожалуйста, удалите текущий токен и авторизуйтесь заново.
+              </Typography>
+            </Alert>
+          )}
+          
+          {/* Add specific help for PKCE errors */}
+          {pkceError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <Typography variant="subtitle2">Произошла ошибка PKCE аутентификации</Typography>
+              <Typography variant="body2">
+                {pkceError}. Рекомендуется очистить cookies и кэш браузера перед повторной попыткой.
               </Typography>
             </Alert>
           )}

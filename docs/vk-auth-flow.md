@@ -245,6 +245,63 @@ async refreshToken(vkUserId) {
 }
 ```
 
+## PKCE Implementation
+
+As of 2023, VK ID requires PKCE (Proof Key for Code Exchange) for enhanced security. Our implementation uses the following PKCE flow:
+
+### 1. Generate Code Verifier and Challenge
+
+When generating the authorization URL, we create a code verifier and code challenge:
+
+```javascript
+// In vkAuthService.js
+const codeVerifier = this.generateRandomString(64); // Random string for PKCE
+const codeChallenge = this.generateCodeChallenge(codeVerifier); // For simple implementation we use plain transformation
+
+// Store the verifier for later use
+this.storeAuthParams(state, { codeVerifier, redirectUri });
+
+// Add PKCE parameters to the URL
+return `https://id.vk.com/authorize?` +
+  // ...other parameters...
+  `&code_challenge=${codeChallenge}` +
+  `&code_challenge_method=plain` +
+  // ...other parameters...
+```
+
+### 2. Pass Code Verifier During Token Exchange
+
+When exchanging the authorization code for tokens, we include the code verifier:
+
+```javascript
+async getTokenByCode(code, state, redirectUri) {
+  // Retrieve the previously stored code verifier
+  const storedParams = this.getAuthParams(state);
+  
+  // Include code_verifier in the token request
+  const formData = new URLSearchParams();
+  formData.append('client_id', appId);
+  formData.append('client_secret', appSecret);
+  formData.append('redirect_uri', finalRedirectUri);
+  formData.append('code', code);
+  formData.append('code_verifier', storedParams.codeVerifier);
+  formData.append('grant_type', 'authorization_code');
+  
+  // Make the token request
+  const response = await axios.post('https://oauth.vk.com/access_token', formData, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+}
+```
+
+### Security Considerations
+
+- In production, it's recommended to use the S256 method for code challenge generation, which involves SHA-256 hashing
+- The code verifier should be stored securely, ideally in a distributed cache like Redis for stateless servers
+- The code verifier should only be valid for a short period (typically 10 minutes)
+
 ## Common Authorization Issues
 
 1. **Missing Permissions**: If the user doesn't grant all requested permissions, API calls may fail with "Access denied" errors (especially for wall posting)

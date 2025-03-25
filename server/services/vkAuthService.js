@@ -22,21 +22,35 @@ class VkAuthService {
     // Generate secure state for CSRF protection
     const state = this.generateRandomString(32);
     
+    // Generate code verifier for PKCE
+    const codeVerifier = this.generateRandomString(64);
+    
+    // Generate code challenge from verifier
+    const codeChallenge = this.generateCodeChallenge(codeVerifier);
+    
+    // Store the code verifier to use later when exchanging the code
+    this.storeAuthParams(state, {
+      codeVerifier,
+      redirectUri
+    });
+    
     // Define required scopes for VK ID
-    // Using a more modern approach with the VK ID auth endpoint
     const scopeValue = "wall,photos,groups,video,offline,docs,manage";
     
     console.log(`Creating VK auth URL with scope: ${scopeValue}`);
     console.log('Using redirect URI for authorization:', redirectUri);
+    console.log('Using code challenge:', codeChallenge);
     
-    // Use the new VK ID authorization endpoint
+    // Use the VK ID authorization endpoint with PKCE parameters
     return `https://id.vk.com/authorize?` +
       `client_id=${vkAppId}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&display=page` +
       `&scope=${scopeValue}` +
       `&response_type=code` +
-      `&state=${state}` + // Include state for CSRF protection
+      `&state=${state}` + 
+      `&code_challenge=${codeChallenge}` +
+      `&code_challenge_method=plain` +  // We're using plain method for simplicity, should use S256 in production
       `&v=5.131`;
   }
   
@@ -61,8 +75,8 @@ class VkAuthService {
    * @returns {string} Code challenge
    */
   generateCodeChallenge(codeVerifier) {
-    // For simplicity we're returning the verifier directly
-    // In a full PKCE implementation you'd use SHA256 here
+    // For simplicity, we're using the "plain" method, where challenge = verifier
+    // In production, should use "S256" method with SHA-256 hashing
     return codeVerifier;
   }
   
@@ -77,6 +91,8 @@ class VkAuthService {
     if (!this.authParamsStore) {
       this.authParamsStore = new Map();
     }
+    
+    console.log(`Storing auth params for state ${state}: `, params);
     
     this.authParamsStore.set(state, {
       ...params,
@@ -103,8 +119,11 @@ class VkAuthService {
     
     const params = this.authParamsStore.get(state);
     if (params) {
+      console.log(`Retrieved auth params for state ${state}: `, params);
       // Remove from store after use
       this.authParamsStore.delete(state);
+    } else {
+      console.log(`No auth params found for state ${state}`);
     }
     
     return params;
@@ -133,6 +152,15 @@ class VkAuthService {
    */
   async getTokenByCode(code, state, redirectUri) {
     try {
+      // Retrieve the code verifier using the state parameter
+      const storedParams = this.getAuthParams(state);
+      if (!storedParams || !storedParams.codeVerifier) {
+        throw new Error('Invalid or expired state parameter. Please try authorizing again.');
+      }
+      
+      // Use the stored redirect URI if available, fallback to the one provided
+      const finalRedirectUri = storedParams.redirectUri || redirectUri;
+      
       const appId = config.vk.appId || await this.getAppIdFromSettings();
       const appSecret = config.vk.appSecret || await this.getAppSecretFromSettings();
       
@@ -141,14 +169,16 @@ class VkAuthService {
       }
 
       // Log the redirect URI to verify it matches
-      console.log('Using redirect URI for token exchange:', redirectUri);
+      console.log('Using redirect URI for token exchange:', finalRedirectUri);
+      console.log('Using code verifier from stored params:', storedParams.codeVerifier);
       
       // Use POST request with form-data as per VK ID documentation
       const formData = new URLSearchParams();
       formData.append('client_id', appId);
       formData.append('client_secret', appSecret);
-      formData.append('redirect_uri', redirectUri);
+      formData.append('redirect_uri', finalRedirectUri);
       formData.append('code', code);
+      formData.append('code_verifier', storedParams.codeVerifier);
       formData.append('grant_type', 'authorization_code');
       
       // Make POST request to VK ID token endpoint
