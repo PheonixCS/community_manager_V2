@@ -255,6 +255,9 @@ const PublishTaskForm = () => {
     severity: 'info'
   });
   
+  // Add the missing state variable for groups loading
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  
   // Dialogs state
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
@@ -361,7 +364,7 @@ const PublishTaskForm = () => {
   
   const fetchGroups = async () => {
     try {
-      setGroupsLoading(true); // Add loading state if not already present
+      setGroupsLoading(true); // Now this will work
       
       // First try the primary endpoint
       const response = await axios.get('/api/settings/vk-groups');
@@ -409,7 +412,7 @@ const PublishTaskForm = () => {
       console.error('Error fetching groups:', error);
       setFallbackGroups();
     } finally {
-      setGroupsLoading && setGroupsLoading(false);
+      setGroupsLoading(false); // Now this will work
     }
   };
   
@@ -1305,10 +1308,14 @@ const PublishTaskForm = () => {
           </Box>
         </DialogTitle>
         <DialogContent dividers>
-          {availableGroups.length === 0 ? (
+          {groupsLoading ? ( // Use groupsLoading here for consistency
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
               <CircularProgress size={40} sx={{ mb: 2 }} />
               <Typography>Загрузка списка групп...</Typography>
+            </Box>
+          ) : availableGroups.length === 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
+              <Typography>Нет доступных групп</Typography>
             </Box>
           ) : (
             <Box sx={{ my: 1 }}>
