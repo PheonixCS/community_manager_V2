@@ -128,6 +128,10 @@ class ScrapingService {
         ]
       });
       
+      // Определяем, является ли пост каруселью
+      const isCarousel = post.carousel_offset !== undefined && post.carousel_offset === 0;
+      console.log(`Пост ${post.id} ${isCarousel ? 'является' : 'не является'} каруселью`);
+      
       if (existingPost) {
         console.log(`Пост ${post.id} уже существует, обновляем...`);
         // Обновляем существующий пост
@@ -135,6 +139,7 @@ class ScrapingService {
         existingPost.reposts = post.reposts?.count || 0;
         existingPost.views = post.views?.count || 0;
         existingPost.lastUpdated = new Date();
+        existingPost.isCarousel = isCarousel; // Добавляем флаг карусели
         
         // Рассчитываем рейтинг просмотров
         existingPost.viewRate = existingPost.calculateViewRate();
@@ -200,6 +205,7 @@ class ScrapingService {
         reposts: post.reposts?.count || 0,
         views: post.views?.count || 0,
         attachments: post.attachments || [],
+        isCarousel: isCarousel, // Добавляем флаг карусели
         createdAt: new Date(),
         lastUpdated: new Date(),
         mediaDownloads: [],
@@ -294,56 +300,26 @@ class ScrapingService {
           
           // Определяем URL и имя файла в зависимости от типа вложения
           if (attachment.type === 'photo') {
-            // Находим фото наилучшего качества
-            // VK API обычно предоставляет различные размеры, отсортированные по типу (s, m, x, y, z, w)
-            // где w обычно имеет наивысшее качество
+            // Используем последний размер в массиве (обычно самый большой)
             const sizes = attachment.photo.sizes;
-            
-            // Предпочтительный порядок типов размеров от наилучшего к худшему
-            const preferredTypes = ['w', 'z', 'y', 'x', 'r', 'q', 'p', 'o', 'm', 's'];
-            
-            // Сначала пробуем найти фото по предпочтительным типам
-            let bestPhoto = null;
-            for (const type of preferredTypes) {
-              bestPhoto = sizes.find(size => size.type === type);
-              if (bestPhoto) break;
-            }
-            
-            // Если не нашли по типу, используем старую логику (выбор по размеру)
-            if (!bestPhoto) {
-              bestPhoto = sizes.reduce((prev, current) => 
-                (prev.width * prev.height > current.width * current.height) ? prev : current, sizes[0]);
-              console.log(`Using fallback size selection for photo in post ${post.id}, selected size: ${bestPhoto.width}x${bestPhoto.height}`);
+            if (sizes && sizes.length > 0) {
+              const bestPhoto = sizes[sizes.length - 1]; // Берем последний размер
+              
+              mediaUrl = bestPhoto.url;
+              console.log(`Selected photo (${bestPhoto.width}x${bestPhoto.height}) for post ${post.id}, from index ${sizes.length - 1} of ${sizes.length}`);
+              filename = `photo_${post.id}_${index}.jpg`;
             } else {
-              console.log(`Selected photo type ${bestPhoto.type} (${bestPhoto.width}x${bestPhoto.height}) for post ${post.id}`);
+              console.log(`No photo sizes found for post ${post.id}`);
+              continue;
             }
-            
-            mediaUrl = bestPhoto.url;
-            filename = `photo_${post.id}_${index}.jpg`;
           } 
           else if (attachment.type === 'video') {
-            // Для видео также выбираем превью наилучшего качества
+            // Для видео также выбираем последнее превью из массива
             if (attachment.video.image && attachment.video.image.length > 0) {
-              // Предпочтительный порядок типов размеров от наилучшего к худшему для видео
-              const preferredTypes = ['w', 'z', 'y', 'x', 'm', 's'];
-              
-              let bestImage = null;
-              for (const type of preferredTypes) {
-                bestImage = attachment.video.image.find(img => img.type === type);
-                if (bestImage) break;
-              }
-              
-              // Если не нашли по типу, используем выбор по размеру
-              if (!bestImage) {
-                bestImage = attachment.video.image.reduce((prev, current) => 
-                  (prev.width * prev.height > current.width * current.height) ? prev : current, 
-                  attachment.video.image[0]);
-                console.log(`Using fallback size selection for video preview in post ${post.id}`);
-              } else {
-                console.log(`Selected video preview type ${bestImage.type} for post ${post.id}`);
-              }
+              const bestImage = attachment.video.image[attachment.video.image.length - 1];
               
               mediaUrl = bestImage.url;
+              console.log(`Selected video preview (${bestImage.width}x${bestImage.height}) for post ${post.id}`);
               filename = `video_preview_${post.id}_${index}.jpg`;
             } else {
               console.log(`No preview image for video in post ${post.id}`);
