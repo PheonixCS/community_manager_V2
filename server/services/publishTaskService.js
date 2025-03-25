@@ -248,86 +248,87 @@ class PublishTaskService {
       //   result.failed += task.targetGroups.length;
       //   return;
       // }
+      // Для каждой целевой группы публикуем лучшие посты
+      for (const targetGroup of task.targetGroups) {
+        for (const post of bestPosts) {
+          try {
+            console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens?.length || 'unknown'} active tokens`);
+            
+            // Публикуем пост в целевую группу
+            const publishResult = await vkPostingService.publishExistingPost(
+              post._id.toString(),
+              targetGroup.groupId,
+              task.publishOptions
+            );
+            
+            if (publishResult.status === 'success') {
+              // Сохраняем историю публикации
+              await publishTaskRepository.savePublishHistory({
+                sourcePostId: post.postId,
+                postId: post._id,
+                sourceGroupId: post.communityId,
+                targetGroupId: targetGroup.groupId,
+                targetPostId: publishResult.postId || 'unknown',
+                targetPostUrl: publishResult.vkUrl || '',
+                publishedAt: new Date(),
+                publishTaskId: task._id,
+                status: 'success'
+              });
+              
+              result.successful++;
+            } else {
+              // Сохраняем информацию об ошибке
+              await publishTaskRepository.savePublishHistory({
+                sourcePostId: post.postId,
+                postId: post._id,
+                sourceGroupId: post.communityId,
+                targetGroupId: targetGroup.groupId,
+                publishedAt: new Date(),
+                publishTaskId: task._id,
+                status: 'failed',
+                targetPostId: 'failed_publish', // Add this to prevent validation errors
+                errorMessage: publishResult.error || 'Unknown error'
+              });
+              
+              result.failed++;
+            }
+            
+          } catch (error) {
+            console.error(`Error publishing post ${post._id} to group ${targetGroup.groupId}:`, error);
+            
+            // Добавляем дополнительное сообщение, если ошибка связана с отсутствием токена
+            let errorMessage = error.message;
+            if (error.message.includes('токен') || error.message.includes('авторизоваться')) {
+              errorMessage += ' Перейдите в раздел "Авторизация ВКонтакте" для добавления токена.';
+            }
+            
+            // Save error information (with error handling)
+            try {
+              await publishTaskRepository.savePublishHistory({
+                sourcePostId: post.postId || 'unknown',
+                postId: post._id,
+                sourceGroupId: post.communityId || 'unknown',
+                targetGroupId: targetGroup.groupId,
+                publishedAt: new Date(),
+                publishTaskId: task._id,
+                status: 'failed',
+                targetPostId: 'error', // Add this to prevent validation errors
+                errorMessage: errorMessage
+              });
+            } catch (historyError) {
+              console.error('Failed to save error history:', historyError);
+            }
+            
+            result.failed++;
+          }
+        }
+      }
     } catch (tokenCheckError) {
       console.error('Error checking tokens:', tokenCheckError);
       // Continue and let the posting attempt handle specific errors
     }
     
-    // Для каждой целевой группы публикуем лучшие посты
-    for (const targetGroup of task.targetGroups) {
-      for (const post of bestPosts) {
-        try {
-          console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens?.length || 'unknown'} active tokens`);
-          
-          // Публикуем пост в целевую группу
-          const publishResult = await vkPostingService.publishExistingPost(
-            post._id.toString(),
-            targetGroup.groupId,
-            task.publishOptions
-          );
-          
-          if (publishResult.status === 'success') {
-            // Сохраняем историю публикации
-            await publishTaskRepository.savePublishHistory({
-              sourcePostId: post.postId,
-              postId: post._id,
-              sourceGroupId: post.communityId,
-              targetGroupId: targetGroup.groupId,
-              targetPostId: publishResult.postId || 'unknown',
-              targetPostUrl: publishResult.vkUrl || '',
-              publishedAt: new Date(),
-              publishTaskId: task._id,
-              status: 'success'
-            });
-            
-            result.successful++;
-          } else {
-            // Сохраняем информацию об ошибке
-            await publishTaskRepository.savePublishHistory({
-              sourcePostId: post.postId,
-              postId: post._id,
-              sourceGroupId: post.communityId,
-              targetGroupId: targetGroup.groupId,
-              publishedAt: new Date(),
-              publishTaskId: task._id,
-              status: 'failed',
-              targetPostId: 'failed_publish', // Add this to prevent validation errors
-              errorMessage: publishResult.error || 'Unknown error'
-            });
-            
-            result.failed++;
-          }
-          
-        } catch (error) {
-          console.error(`Error publishing post ${post._id} to group ${targetGroup.groupId}:`, error);
-          
-          // Добавляем дополнительное сообщение, если ошибка связана с отсутствием токена
-          let errorMessage = error.message;
-          if (error.message.includes('токен') || error.message.includes('авторизоваться')) {
-            errorMessage += ' Перейдите в раздел "Авторизация ВКонтакте" для добавления токена.';
-          }
-          
-          // Save error information (with error handling)
-          try {
-            await publishTaskRepository.savePublishHistory({
-              sourcePostId: post.postId || 'unknown',
-              postId: post._id,
-              sourceGroupId: post.communityId || 'unknown',
-              targetGroupId: targetGroup.groupId,
-              publishedAt: new Date(),
-              publishTaskId: task._id,
-              status: 'failed',
-              targetPostId: 'error', // Add this to prevent validation errors
-              errorMessage: errorMessage
-            });
-          } catch (historyError) {
-            console.error('Failed to save error history:', historyError);
-          }
-          
-          result.failed++;
-        }
-      }
-    }
+    
   }
 
   /**
