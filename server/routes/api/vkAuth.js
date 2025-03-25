@@ -11,7 +11,7 @@ router.get('/auth-url', (req, res) => {
     // В продакшене нужно получать хост из заголовков или конфига
     const protocol = req.secure ? 'https' : 'http';
     const host = req.get('host');
-    const redirectUri = `${protocol}://${host}/api/vk-auth/callback`;
+    const redirectUri = `https://${host}/api/vk-auth/callback`;
     
     const authUrl = vkAuthService.getAuthUrl(redirectUri);
     res.json({ authUrl });
