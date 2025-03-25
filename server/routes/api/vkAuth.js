@@ -43,8 +43,8 @@ router.get('/callback', async (req, res) => {
     // Use the exact same redirect URI as in the auth URL request
     const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
     
-    // Получаем токен по коду
-    const result = await vkAuthService.getTokenByCode(code, redirectUri);
+    // Pass the state to token exchange to validate it and retrieve stored params
+    const result = await vkAuthService.getTokenByCode(code, state, redirectUri);
     
     // Log the received token scope for debugging
     console.log('Received token with scope:', result.token.scope);

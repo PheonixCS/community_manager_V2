@@ -169,14 +169,14 @@ const VkAuthManager = () => {
     }
     
     // Show permission guidance directly to user
-    showSnackbar('Важно! Для работы необходимо разрешить ВСЕ запрашиваемые права доступа.', 'warning');
+    showSnackbar('ВАЖНО! Необходимо в открывшемся окне ВКонтакте нажать "Разрешить"!', 'warning');
     
-    // Open the auth URL in a new window
-    const authWindow = window.open(authUrl, 'VK Authorization', 'width=800,height=600');
+    // Open the auth URL in a new tab that's larger to properly display the VK permission screen
+    const authWindow = window.open(authUrl, 'VK Authorization', 'width=1000,height=800,top=100,left=100');
     
     // Poll for the window to close
     const checkWindowClosed = setInterval(() => {
-      if (authWindow.closed) {
+      if (authWindow && authWindow.closed) {
         clearInterval(checkWindowClosed);
         // Refresh tokens after window closes
         fetchTokens();

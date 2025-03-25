@@ -7,7 +7,30 @@ const vkConfig = {
   redirectUri: process.env.VK_REDIRECT_URI || 'https://krazu-group.tech/api/vk-auth/callback',
   token: process.env.VK_TOKEN || '8642adf18642adf18642adf16f856644f9886428642adf1e100516a63045e8341fbf21a', // Use service token as fallback
   apiVersion: '5.131',
-  userId: process.env.VK_USER_ID || '123456789' // Add a default user ID (replace with your actual user ID)
+  userId: process.env.VK_USER_ID || '123456789', // Add a default user ID (replace with your actual user ID)
+  // Add a list of scope names to their bit values for conversion
+  scopeMappings: {
+    'notify': 1,
+    'friends': 2,
+    'photos': 4,
+    'audio': 8,
+    'video': 16,
+    'stories': 32,
+    'pages': 64,
+    'status': 128,
+    'notes': 256,
+    'messages': 512,
+    'wall': 1024,
+    'ads': 2048,
+    'offline': 4096,
+    'docs': 8192,
+    'groups': 16384,
+    'notifications': 32768,
+    'stats': 65536,
+    'email': 131072,
+    'market': 262144,
+    'phone': 524288
+  }
 };
 
 module.exports = {

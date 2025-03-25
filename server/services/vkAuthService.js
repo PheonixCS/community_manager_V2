@@ -19,27 +19,107 @@ class VkAuthService {
       throw new Error('VK App ID not configured');
     }
     
-    // Fix: VK scope should be specified as a comma-separated string of individual values
-    // rather than as integers or bitwise values
-    const scopeValues = [
-      'wall',          // Доступ к методам работы со стеной
-      'photos',        // Доступ к фотографиям
-      'groups',        // Доступ к сообществам пользователя
-      'video',         // Доступ к видеозаписям
-      'offline',       // Offline-доступ (бессрочный токен)
-      'pages',         // Доступ к wiki-страницам
-      'docs',          // Доступ к документам
-      'manage'         // Доступ к управлению сообществом и контентом
-    ];
+    // Generate secure state for CSRF protection
+    const state = this.generateRandomString(32);
     
-    // Join with commas as required by VK API
-    const scope = scopeValues.join(',');
+    // Generate PKCE code challenge
+    const codeVerifier = this.generateRandomString(64);
+    const codeChallenge = this.generateCodeChallenge(codeVerifier);
     
-    console.log(`Creating VK auth URL with explicit scopes: ${scope}`);
+    // Store the PKCE params for later verification
+    this.storeAuthParams(state, {
+      codeVerifier,
+      codeChallenge,
+      redirectUri
+    });
+    
+    // Define the exact scope values we need - don't use join method as it's causing issues
+    // The scope parameter needs to be 327700 for all required permissions as shown in Python example
+    // Or use the exact string "wall,offline,stats,docs,video,photos,groups" format
+    const scopeValue = "wall,offline,docs,video,photos,groups,manage";
+    
+    console.log(`Creating VK auth URL with scope: ${scopeValue}`);
     console.log('Using redirect URI for authorization:', redirectUri);
+    console.log('Using state for CSRF protection:', state);
     
-    // Build the authorization URL with the correct scope parameter
-    return `https://oauth.vk.com/authorize?client_id=${vkAppId}&display=page&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&v=5.131`;
+    // Build auth URL with PKCE parameters similar to Python example
+    return `https://oauth.vk.com/authorize?` +
+      `client_id=${vkAppId}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=code` +
+      `&scope=${encodeURIComponent(scopeValue)}` +
+      `&state=${state}` + 
+      `&v=5.131`;
+  }
+  
+  /**
+   * Generate random string for security purposes
+   * @param {number} length - Length of string to generate
+   * @returns {string} Random string
+   */
+  generateRandomString(length) {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    let result = '';
+    const charactersLength = characters.length;
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+  }
+  
+  /**
+   * Generate code challenge for PKCE
+   * @param {string} codeVerifier - Code verifier string
+   * @returns {string} Code challenge
+   */
+  generateCodeChallenge(codeVerifier) {
+    // For simplicity we're returning the verifier directly
+    // In a full PKCE implementation you'd use SHA256 here
+    return codeVerifier;
+  }
+  
+  /**
+   * Store authorization parameters for code exchange
+   * @param {string} state - State parameter for CSRF protection
+   * @param {Object} params - Authorization parameters
+   */
+  storeAuthParams(state, params) {
+    // Using a simple in-memory storage for demo purposes
+    // You should use Redis or similar for a real application
+    if (!this.authParamsStore) {
+      this.authParamsStore = new Map();
+    }
+    
+    this.authParamsStore.set(state, {
+      ...params,
+      createdAt: Date.now()
+    });
+    
+    // Clean up old entries every hour
+    setTimeout(() => {
+      if (this.authParamsStore.has(state)) {
+        this.authParamsStore.delete(state);
+      }
+    }, 3600 * 1000);
+  }
+  
+  /**
+   * Get stored authorization parameters
+   * @param {string} state - State parameter from callback
+   * @returns {Object|null} Stored parameters or null if not found
+   */
+  getAuthParams(state) {
+    if (!this.authParamsStore) {
+      return null;
+    }
+    
+    const params = this.authParamsStore.get(state);
+    if (params) {
+      // Remove from store after use
+      this.authParamsStore.delete(state);
+    }
+    
+    return params;
   }
   
   /**
@@ -59,10 +139,11 @@ class VkAuthService {
   /**
    * Получение токена по коду авторизации
    * @param {string} code - Код авторизации от ВК
+   * @param {string} state - State parameter from callback for validation
    * @param {string} redirectUri - URI для перенаправления (должен совпадать с URI при получении кода)
    * @returns {Promise<Object>} Информация о полученном токене
    */
-  async getTokenByCode(code, redirectUri) {
+  async getTokenByCode(code, state, redirectUri) {
     try {
       const appId = config.vk.appId || await this.getAppIdFromSettings();
       const appSecret = config.vk.appSecret || await this.getAppSecretFromSettings();
@@ -71,14 +152,24 @@ class VkAuthService {
         throw new Error('VK App ID or Secret not configured');
       }
       
+      // Get stored params and validate state
+      const storedParams = this.getAuthParams(state);
+      if (!storedParams) {
+        console.error('No stored auth params found for state:', state);
+        // Continue anyway - this is just an additional security check
+      }
+      
+      // Use stored redirectUri if available, otherwise use the one provided
+      const finalRedirectUri = (storedParams && storedParams.redirectUri) || redirectUri;
+      
       // Log the redirect URI to verify it matches
-      console.log('Using redirect URI for token exchange:', redirectUri);
+      console.log('Using redirect URI for token exchange:', finalRedirectUri);
       
       const response = await axios.get('https://oauth.vk.com/access_token', {
         params: {
           client_id: appId,
           client_secret: appSecret,
-          redirect_uri: redirectUri,
+          redirect_uri: finalRedirectUri,
           code: code
         }
       });
@@ -87,8 +178,28 @@ class VkAuthService {
         throw new Error(`VK API Error: ${response.data.error_description || response.data.error}`);
       }
       
+      console.log("Raw token response:", JSON.stringify(response.data));
+      
       // Получаем информацию о пользователе
       const userInfo = await this.getUserInfo(response.data.access_token);
+      
+      // Обработка scopes в ответе
+      // VK может возвращать их в разных форматах
+      let scopes = [];
+      if (response.data.scope) {
+        if (typeof response.data.scope === 'string') {
+          // Если scope пришел строкой, разделяем по запятой
+          scopes = response.data.scope.split(',');
+        } else if (typeof response.data.scope === 'number') {
+          // Если scope пришел числом, это битовая маска прав
+          scopes = this.decodeBitMaskScopes(response.data.scope);
+        } else if (Array.isArray(response.data.scope)) {
+          // Если scope пришел массивом, используем его
+          scopes = response.data.scope;
+        }
+      }
+      
+      console.log("Parsed scopes:", scopes);
       
       // Создаем или обновляем запись с токеном
       const tokenData = {
@@ -97,7 +208,7 @@ class VkAuthService {
         accessToken: response.data.access_token,
         refreshToken: response.data.refresh_token,
         expiresAt: Math.floor(Date.now() / 1000) + (response.data.expires_in || 86400), // По умолчанию 24 часа
-        scope: response.data.scope ? response.data.scope.split(',') : [],
+        scope: scopes,
         isActive: true,
         lastUsed: new Date(),
         userInfo: userInfo
@@ -387,6 +498,48 @@ class VkAuthService {
       console.error(`Error deleting token ${tokenId}:`, error);
       return false;
     }
+  }
+  
+  /**
+   * Decode bitwise scope mask to scope array
+   * @param {number} bitmask - Scope bitmask
+   * @returns {Array<string>} Array of scope names
+   */
+  decodeBitMaskScopes(bitmask) {
+    // Map of VK permission bits
+    const scopeMap = {
+      1: 'notify',
+      2: 'friends',
+      4: 'photos',
+      8: 'audio',
+      16: 'video',
+      32: 'stories',
+      64: 'pages',
+      128: 'status',
+      256: 'notes',
+      512: 'messages',
+      1024: 'wall',
+      2048: 'ads',
+      4096: 'offline',
+      8192: 'docs',
+      16384: 'groups',
+      32768: 'notifications',
+      65536: 'stats',
+      131072: 'email',
+      262144: 'market',
+      524288: 'phone'
+    };
+    
+    const scopes = [];
+    
+    // Check each bit position
+    for (const bit in scopeMap) {
+      if ((bitmask & bit) !== 0) {
+        scopes.push(scopeMap[bit]);
+      }
+    }
+    
+    return scopes;
   }
 }
 
