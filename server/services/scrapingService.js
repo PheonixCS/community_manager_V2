@@ -294,23 +294,56 @@ class ScrapingService {
           
           // Определяем URL и имя файла в зависимости от типа вложения
           if (attachment.type === 'photo') {
-            // Находим самое большое фото
+            // Находим фото наилучшего качества
+            // VK API обычно предоставляет различные размеры, отсортированные по типу (s, m, x, y, z, w)
+            // где w обычно имеет наивысшее качество
             const sizes = attachment.photo.sizes;
-            const largestPhoto = sizes.reduce((prev, current) => 
-              (prev.width * prev.height > current.width * current.height) ? prev : current
-            );
             
-            mediaUrl = largestPhoto.url;
+            // Предпочтительный порядок типов размеров от наилучшего к худшему
+            const preferredTypes = ['w', 'z', 'y', 'x', 'r', 'q', 'p', 'o', 'm', 's'];
+            
+            // Сначала пробуем найти фото по предпочтительным типам
+            let bestPhoto = null;
+            for (const type of preferredTypes) {
+              bestPhoto = sizes.find(size => size.type === type);
+              if (bestPhoto) break;
+            }
+            
+            // Если не нашли по типу, используем старую логику (выбор по размеру)
+            if (!bestPhoto) {
+              bestPhoto = sizes.reduce((prev, current) => 
+                (prev.width * prev.height > current.width * current.height) ? prev : current, sizes[0]);
+              console.log(`Using fallback size selection for photo in post ${post.id}, selected size: ${bestPhoto.width}x${bestPhoto.height}`);
+            } else {
+              console.log(`Selected photo type ${bestPhoto.type} (${bestPhoto.width}x${bestPhoto.height}) for post ${post.id}`);
+            }
+            
+            mediaUrl = bestPhoto.url;
             filename = `photo_${post.id}_${index}.jpg`;
           } 
           else if (attachment.type === 'video') {
-            // Для видео мы можем сохранить только превью
-            if (attachment.video.image) {
-              const largestImage = attachment.video.image.reduce((prev, current) => 
-                (prev.width * prev.height > current.width * current.height) ? prev : current
-              );
+            // Для видео также выбираем превью наилучшего качества
+            if (attachment.video.image && attachment.video.image.length > 0) {
+              // Предпочтительный порядок типов размеров от наилучшего к худшему для видео
+              const preferredTypes = ['w', 'z', 'y', 'x', 'm', 's'];
               
-              mediaUrl = largestImage.url;
+              let bestImage = null;
+              for (const type of preferredTypes) {
+                bestImage = attachment.video.image.find(img => img.type === type);
+                if (bestImage) break;
+              }
+              
+              // Если не нашли по типу, используем выбор по размеру
+              if (!bestImage) {
+                bestImage = attachment.video.image.reduce((prev, current) => 
+                  (prev.width * prev.height > current.width * current.height) ? prev : current, 
+                  attachment.video.image[0]);
+                console.log(`Using fallback size selection for video preview in post ${post.id}`);
+              } else {
+                console.log(`Selected video preview type ${bestImage.type} for post ${post.id}`);
+              }
+              
+              mediaUrl = bestImage.url;
               filename = `video_preview_${post.id}_${index}.jpg`;
             } else {
               console.log(`No preview image for video in post ${post.id}`);
