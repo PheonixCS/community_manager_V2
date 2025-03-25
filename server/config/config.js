@@ -9,13 +9,13 @@ module.exports = {
   },
   vkApi: {
     // ID приложения ВКонтакте
-    appId: process.env.VK_APP_ID,
+    appId: 52750600,
     
     // Секретный ключ приложения ВКонтакте
-    appSecret: process.env.VK_APP_SECRET,
+    appSecret: "6IXAcrW9vfarh8sncrTi",
     
     // Сервисный ключ (если используется)
-    serviceToken: process.env.VK_SERVICE_TOKEN,
+    serviceToken: "8642adf18642adf18642adf16f856644f9886428642adf1e100516a63045e8341fbf21a",
     
     // Версия API
     version: '5.131'
