@@ -116,6 +116,16 @@ const PublishTaskSchema = new Schema({
     markedAsAds: {
       type: Boolean,
       default: false
+    },
+    // Удалить все хештеги из текста поста
+    removeHashtags: {
+      type: Boolean,
+      default: false
+    },
+    // Транслитерация (замена русских символов на английские)
+    transliterate: {
+      type: Boolean,
+      default: false
     }
   },
   
