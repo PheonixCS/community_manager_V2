@@ -257,6 +257,9 @@ class PublishTaskService {
             // Создаем копию поста для модификации
             const modifiedPost = { ...post.toObject() };
             
+            // ВАЖНО: сначала применяем базовые трансформации текста согласно настройкам publishOptions,
+            // затем применяем настройки кастомизации, которые добавляют контент
+            
             // Применяем трансформации текста согласно настройкам задачи публикации
             if (task.publishOptions.removeHashtags && modifiedPost.text) {
               modifiedPost.text = this.removeHashtags(modifiedPost.text);
@@ -267,7 +270,7 @@ class PublishTaskService {
               modifiedPost.text = this.transliterateText(modifiedPost.text);
             }
             
-            // Применяем настройки кастомизации поста
+            // После базовых трансформаций применяем настройки кастомизации поста
             if (task.postCustomization) {
               // Добавляем текст в начало или конец поста
               if (task.postCustomization.addText?.enabled && task.postCustomization.addText?.text) {
@@ -310,17 +313,12 @@ class PublishTaskService {
               }
             }
             
-            // Применяем измененный текст к оригинальному посту
-            post.text = modifiedPost.text;
-            if (modifiedPost.attachments) {
-              post.attachments = modifiedPost.attachments;
-            }
-            
-            // Публикуем пост в целевую группу
+            // Публикуем пост в целевую группу, передавая модифицированный пост напрямую
             const publishResult = await vkPostingService.publishExistingPost(
-              post._id.toString(),
+              modifiedPost, // Передаем модифицированный объект поста вместо ID
               targetGroup.groupId,
-              task.publishOptions
+              task.publishOptions,
+              post._id // Передаем ID оригинального поста для обновления данных в БД
             );
             
             if (publishResult.status === 'success') {
