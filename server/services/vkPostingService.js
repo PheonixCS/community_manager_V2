@@ -561,7 +561,8 @@ class VkPostingService {
       // Add access token and API version to form data
       formData.append('access_token', token);
       formData.append('v', '5.131');
-      
+      formData.append('primary_attachments_mode', 'carousel');
+      formData.append('from_group', '1');
       // Add all post data parameters to form data
       for (const [key, value] of Object.entries(postData)) {
         if (value !== undefined && value !== null) {
