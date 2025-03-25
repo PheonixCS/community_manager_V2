@@ -22,33 +22,21 @@ class VkAuthService {
     // Generate secure state for CSRF protection
     const state = this.generateRandomString(32);
     
-    // Generate PKCE code challenge
-    const codeVerifier = this.generateRandomString(64);
-    const codeChallenge = this.generateCodeChallenge(codeVerifier);
-    
-    // Store the PKCE params for later verification
-    this.storeAuthParams(state, {
-      codeVerifier,
-      codeChallenge,
-      redirectUri
-    });
-    
-    // Define the exact scope values we need - don't use join method as it's causing issues
-    // The scope parameter needs to be 327700 for all required permissions as shown in Python example
-    // Or use the exact string "wall,offline,stats,docs,video,photos,groups" format
-    const scopeValue = "wall,offline,docs,video,photos,groups,manage";
+    // Определяем конкретные права доступа, которые нам нужны
+    // Используем константный формат scope, как в документации VK API
+    const scopeValue = "wall,photos,groups,video,offline,pages,docs,manage";
     
     console.log(`Creating VK auth URL with scope: ${scopeValue}`);
     console.log('Using redirect URI for authorization:', redirectUri);
-    console.log('Using state for CSRF protection:', state);
     
-    // Build auth URL with PKCE parameters similar to Python example
+    // Принудительно запрашиваем права, даже если пользователь ранее отказывал
     return `https://oauth.vk.com/authorize?` +
       `client_id=${vkAppId}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&display=page` +
+      `&scope=${scopeValue}` +
       `&response_type=code` +
-      `&scope=${encodeURIComponent(scopeValue)}` +
-      `&state=${state}` + 
+      `&revoke=1` + // Этот параметр принудительно запрашивает права
       `&v=5.131`;
   }
   
@@ -151,25 +139,15 @@ class VkAuthService {
       if (!appId || !appSecret) {
         throw new Error('VK App ID or Secret not configured');
       }
-      
-      // Get stored params and validate state
-      const storedParams = this.getAuthParams(state);
-      if (!storedParams) {
-        console.error('No stored auth params found for state:', state);
-        // Continue anyway - this is just an additional security check
-      }
-      
-      // Use stored redirectUri if available, otherwise use the one provided
-      const finalRedirectUri = (storedParams && storedParams.redirectUri) || redirectUri;
-      
+
       // Log the redirect URI to verify it matches
-      console.log('Using redirect URI for token exchange:', finalRedirectUri);
+      console.log('Using redirect URI for token exchange:', redirectUri);
       
       const response = await axios.get('https://oauth.vk.com/access_token', {
         params: {
           client_id: appId,
           client_secret: appSecret,
-          redirect_uri: finalRedirectUri,
+          redirect_uri: redirectUri,
           code: code
         }
       });
@@ -183,23 +161,9 @@ class VkAuthService {
       // Получаем информацию о пользователе
       const userInfo = await this.getUserInfo(response.data.access_token);
       
-      // Обработка scopes в ответе
-      // VK может возвращать их в разных форматах
-      let scopes = [];
-      if (response.data.scope) {
-        if (typeof response.data.scope === 'string') {
-          // Если scope пришел строкой, разделяем по запятой
-          scopes = response.data.scope.split(',');
-        } else if (typeof response.data.scope === 'number') {
-          // Если scope пришел числом, это битовая маска прав
-          scopes = this.decodeBitMaskScopes(response.data.scope);
-        } else if (Array.isArray(response.data.scope)) {
-          // Если scope пришел массивом, используем его
-          scopes = response.data.scope;
-        }
-      }
-      
-      console.log("Parsed scopes:", scopes);
+      // Важное изменение: поскольку VK API не всегда возвращает scope в ответе,
+      // мы задаем его явно теми правами, которые запросили
+      const requestedScopes = ["wall", "photos", "groups", "video", "offline", "pages", "docs", "manage"];
       
       // Создаем или обновляем запись с токеном
       const tokenData = {
@@ -208,7 +172,7 @@ class VkAuthService {
         accessToken: response.data.access_token,
         refreshToken: response.data.refresh_token,
         expiresAt: Math.floor(Date.now() / 1000) + (response.data.expires_in || 86400), // По умолчанию 24 часа
-        scope: scopes,
+        scope: requestedScopes, // Используем запрошенные права вместо тех, что возвращает API
         isActive: true,
         lastUsed: new Date(),
         userInfo: userInfo

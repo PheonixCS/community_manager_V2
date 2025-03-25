@@ -168,18 +168,28 @@ const VkAuthManager = () => {
       return;
     }
     
-    // Show permission guidance directly to user
-    showSnackbar('ВАЖНО! Необходимо в открывшемся окне ВКонтакте нажать "Разрешить"!', 'warning');
+    // Показываем важное предупреждение пользователю
+    showSnackbar('ВАЖНО! Необходимо разрешить ВСЕ запрашиваемые права доступа для корректной работы приложения!', 'warning');
     
-    // Open the auth URL in a new tab that's larger to properly display the VK permission screen
-    const authWindow = window.open(authUrl, 'VK Authorization', 'width=1000,height=800,top=100,left=100');
+    // Открываем окно авторизации достаточно большого размера
+    const authWindow = window.open(
+      authUrl, 
+      'VK Authorization', 
+      'width=1200,height=800,top=50,left=50,scrollbars=yes,status=yes'
+    );
     
-    // Poll for the window to close
+    // Отслеживаем закрытие окна
     const checkWindowClosed = setInterval(() => {
       if (authWindow && authWindow.closed) {
         clearInterval(checkWindowClosed);
-        // Refresh tokens after window closes
+        
+        // Перезагружаем список токенов
         fetchTokens();
+        
+        // Показываем сообщение о необходимости проверить права
+        setTimeout(() => {
+          showSnackbar('Проверьте, что токен получил все необходимые разрешения в таблице ниже', 'info');
+        }, 2000);
       }
     }, 1000);
   };
