@@ -216,15 +216,13 @@ const VkAuthManager = () => {
         'width=1200,height=800,top=50,left=50,scrollbars=yes,status=yes'
       );
       
-      // Monitor auth window and handle result
-      // ...existing code for checking window closure...
-      
       // Track authorization status
       let authCheckInterval;
       let authTimeout;
     
-      // Add event listener for auth callback
-      window.addEventListener('message', function handleAuthCallback(event) {
+      // Define the handleAuthCallback function here, inside handleAuthButtonClick
+      // so it has access to the current closure variables (state, codeVerifier, authWindow, etc.)
+      const handleAuthCallback = function(event) {
         // Check if the message is from our application and contains auth data
         if (event.data && event.data.type === 'vk-auth-callback') {
           // Remove the event listener
@@ -284,7 +282,10 @@ const VkAuthManager = () => {
             }
           });
         }
-      });
+      };
+      
+      // Add event listener for auth callback
+      window.addEventListener('message', handleAuthCallback);
       
       // Check every second if window closed without sending message
       authCheckInterval = setInterval(() => {
