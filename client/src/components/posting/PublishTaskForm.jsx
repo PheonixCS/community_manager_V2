@@ -1375,6 +1375,28 @@ const PublishTaskForm = () => {
               label="Пометить как рекламу"
             />
           </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={task.publishOptions.removeHashtags || false}
+                  onChange={(e) => handleNestedChange('publishOptions', 'removeHashtags', e.target.checked)}
+                />
+              }
+              label="Удалить все хештеги из текста поста"
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={task.publishOptions.transliterate || false}
+                  onChange={(e) => handleNestedChange('publishOptions', 'transliterate', e.target.checked)}
+                />
+              }
+              label="Транслитерация (русские символы → английские)"
+            />
+          </Grid>
         </Grid>
       </Paper>
       
