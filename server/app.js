@@ -69,6 +69,10 @@ app.use('/api/vk-auth', require('./routes/api/vkAuth'));
 app.use('/api/vk', require('./routes/api/vk')); // Add this line
 app.use('/api/publish-tasks', require('./routes/api/publishTasks'));
 
+// Add the media routes
+const mediaRoutes = require('./routes/mediaRoutes');
+app.use('/api/media', mediaRoutes);
+
 // Обслуживание статических файлов React в production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));

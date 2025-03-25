@@ -6,7 +6,8 @@ import {
   Chip, Divider, CircularProgress, Alert, Snackbar, IconButton,
   Card, CardContent, CardHeader, Dialog, DialogTitle, DialogContent,
   DialogActions, List, ListItem, ListItemText, ListItemIcon, Checkbox,
-  RadioGroup, Radio, Tab, Tabs
+  RadioGroup, Radio, Tab, Tabs, Accordion, AccordionSummary, AccordionDetails,
+  InputAdornment
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -19,7 +20,14 @@ import {
   Search as SearchIcon,
   ContentPaste as ContentIcon,
   AutoFixHigh as GeneratorIcon,
-  EditCalendar as CalendarIcon
+  EditCalendar as CalendarIcon,
+  ExpandMore as ExpandMoreIcon,
+  TextFields as TextFieldsIcon,
+  Image as ImageIcon,
+  Tag as TagIcon,
+  Link as LinkIcon,
+  Create as CreateIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import taskService from '../../services/taskService';
@@ -241,6 +249,30 @@ const PublishTaskForm = () => {
       fromGroup: true,
       pinned: false,
       markedAsAds: false
+    },
+    // Добавляем настройки кастомизации постов
+    postCustomization: {
+      addText: {
+        enabled: false,
+        position: 'after',
+        text: ''
+      },
+      addImage: {
+        enabled: false,
+        imageUrl: ''
+      },
+      addHashtags: {
+        enabled: false,
+        hashtags: ''
+      },
+      addSourceLink: {
+        enabled: false,
+        text: 'Источник: '
+      },
+      addSignature: {
+        enabled: false,
+        text: ''
+      }
     }
   });
   
@@ -283,6 +315,9 @@ const PublishTaskForm = () => {
     specificTimes: [{ hour: '9', minute: '0' }], // Значение по умолчанию для конкретных времен
     customExpression: '0 9 * * *'
   });
+  
+  // Для предпросмотра изображения
+  const [imagePreview, setImagePreview] = useState(null);
   
   useEffect(() => {
     // Fetch available data
@@ -348,6 +383,13 @@ const PublishTaskForm = () => {
       setScheduleValues({...scheduleValues, ...parsed.values});
     }
   }, [cronBuilderOpen]);
+  
+  // Эффект для инициализации предпросмотра изображения при загрузке формы
+  useEffect(() => {
+    if (task.postCustomization?.addImage?.imageUrl) {
+      setImagePreview(task.postCustomization.addImage.imageUrl);
+    }
+  }, [task.postCustomization?.addImage?.imageUrl]);
   
   const fetchTask = async () => {
     setLoading(true);
@@ -956,6 +998,63 @@ const PublishTaskForm = () => {
     }
   };
   
+  // Для загрузки изображения
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Загрузка изображения...',
+        severity: 'info'
+      });
+      
+      // Создаем FormData для загрузки файла
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Отправляем запрос на загрузку
+      const response = await axios.post('/api/media/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      if (response.data && response.data.url) {
+        // Обновляем URL изображения в настройках
+        handleNestedCustomizationChange('addImage', 'imageUrl', response.data.url);
+        setImagePreview(response.data.url);
+        
+        showSnackbar('Изображение успешно загружено', 'success');
+      } else {
+        showSnackbar('Ошибка при загрузке изображения: неверный ответ сервера', 'error');
+      }
+    } catch (error) {
+      console.error('Ошибка при загрузке изображения:', error);
+      showSnackbar(`Ошибка при загрузке изображения: ${error.message}`, 'error');
+    }
+  };
+  
+  // Обработчик изменения настроек кастомизации
+  const handleNestedCustomizationChange = (field, subfield, value) => {
+    setTask(prev => ({
+      ...prev,
+      postCustomization: {
+        ...prev.postCustomization,
+        [field]: {
+          ...prev.postCustomization[field],
+          [subfield]: value
+        }
+      }
+    }));
+  };
+  
+  // Обработчик переключения включения/выключения опций кастомизации
+  const handleToggleCustomization = (field, value) => {
+    handleNestedCustomizationChange(field, 'enabled', value);
+  };
+  
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center' }}>
@@ -1277,6 +1376,277 @@ const PublishTaskForm = () => {
             />
           </Grid>
         </Grid>
+      </Paper>
+      
+      {/* Новая секция для кастомизации постов */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <SettingsIcon sx={{ mr: 1, color: 'primary.main' }} />
+          <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+            Кастомизация постов
+          </Typography>
+        </Box>
+        
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Настройки кастомизации влияют на все посты, опубликованные через эту задачу. Вы можете добавить текст,
+          изображение, хэштеги и другие элементы к каждому публикуемому посту.
+        </Alert>
+        
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <TextFieldsIcon sx={{ mr: 1, color: task.postCustomization.addText.enabled ? 'primary.main' : 'text.secondary' }} />
+              <Typography>
+                Добавить текст к посту
+                {task.postCustomization.addText.enabled && (
+                  <Chip size="small" color="primary" variant="outlined" label="Включено" sx={{ ml: 1 }} />
+                )}
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={task.postCustomization.addText.enabled}
+                  onChange={(e) => handleToggleCustomization('addText', e.target.checked)}
+                />
+              }
+              label="Включить добавление текста"
+            />
+            
+            {task.postCustomization.addText.enabled && (
+              <Box sx={{ mt: 2 }}>
+                <FormControl component="fieldset" sx={{ mb: 2 }}>
+                  <RadioGroup
+                    row
+                    value={task.postCustomization.addText.position}
+                    onChange={(e) => handleNestedCustomizationChange('addText', 'position', e.target.value)}
+                  >
+                    <FormControlLabel value="before" control={<Radio />} label="В начале поста" />
+                    <FormControlLabel value="after" control={<Radio />} label="В конце поста" />
+                  </RadioGroup>
+                </FormControl>
+                
+                <TextField
+                  label="Текст для добавления"
+                  multiline
+                  rows={4}
+                  value={task.postCustomization.addText.text}
+                  onChange={(e) => handleNestedCustomizationChange('addText', 'text', e.target.value)}
+                  fullWidth
+                  placeholder="Введите текст, который будет добавлен к каждому посту"
+                />
+              </Box>
+            )}
+          </AccordionDetails>
+        </Accordion>
+        
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <ImageIcon sx={{ mr: 1, color: task.postCustomization.addImage.enabled ? 'primary.main' : 'text.secondary' }} />
+              <Typography>
+                Добавить изображение
+                {task.postCustomization.addImage.enabled && (
+                  <Chip size="small" color="primary" variant="outlined" label="Включено" sx={{ ml: 1 }} />
+                )}
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={task.postCustomization.addImage.enabled}
+                  onChange={(e) => handleToggleCustomization('addImage', e.target.checked)}
+                />
+              }
+              label="Включить добавление изображения"
+            />
+            
+            {task.postCustomization.addImage.enabled && (
+              <Box sx={{ mt: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="URL изображения"
+                      value={task.postCustomization.addImage.imageUrl}
+                      onChange={(e) => handleNestedCustomizationChange('addImage', 'imageUrl', e.target.value)}
+                      fullWidth
+                      placeholder="Введите URL изображения или загрузите его"
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <input
+                              accept="image/*"
+                              id="icon-button-file"
+                              type="file"
+                              style={{ display: 'none' }}
+                              onChange={handleImageUpload}
+                            />
+                            <label htmlFor="icon-button-file">
+                              <IconButton color="primary" component="span">
+                                <AddIcon />
+                              </IconButton>
+                            </label>
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      Вы можете ввести URL изображения или загрузить файл
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    {imagePreview && (
+                      <Box sx={{ mt: 1, textAlign: 'center' }}>
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '4px' }}
+                        />
+                      </Box>
+                    )}
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+          </AccordionDetails>
+        </Accordion>
+        
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <TagIcon sx={{ mr: 1, color: task.postCustomization.addHashtags.enabled ? 'primary.main' : 'text.secondary' }} />
+              <Typography>
+                Добавить хэштеги
+                {task.postCustomization.addHashtags.enabled && (
+                  <Chip size="small" color="primary" variant="outlined" label="Включено" sx={{ ml: 1 }} />
+                )}
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={task.postCustomization.addHashtags.enabled}
+                  onChange={(e) => handleToggleCustomization('addHashtags', e.target.checked)}
+                />
+              }
+              label="Включить добавление хэштегов"
+            />
+            
+            {task.postCustomization.addHashtags.enabled && (
+              <Box sx={{ mt: 2 }}>
+                <TextField
+                  label="Хэштеги"
+                  value={task.postCustomization.addHashtags.hashtags}
+                  onChange={(e) => handleNestedCustomizationChange('addHashtags', 'hashtags', e.target.value)}
+                  fullWidth
+                  placeholder="Введите хэштеги через пробел или запятую (например: тренд новости интересно)"
+                  helperText="Символ # будет добавлен автоматически, если его нет"
+                />
+                
+                {task.postCustomization.addHashtags.hashtags && (
+                  <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {task.postCustomization.addHashtags.hashtags
+                      .split(/[\s,]+/)
+                      .filter(tag => tag.length > 0)
+                      .map((tag, index) => (
+                        <Chip
+                          key={index}
+                          label={tag.startsWith('#') ? tag : `#${tag}`}
+                          color="primary"
+                          variant="outlined"
+                          size="small"
+                        />
+                      ))}
+                  </Box>
+                )}
+              </Box>
+            )}
+          </AccordionDetails>
+        </Accordion>
+        
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <LinkIcon sx={{ mr: 1, color: task.postCustomization.addSourceLink.enabled ? 'primary.main' : 'text.secondary' }} />
+              <Typography>
+                Добавить ссылку на источник
+                {task.postCustomization.addSourceLink.enabled && (
+                  <Chip size="small" color="primary" variant="outlined" label="Включено" sx={{ ml: 1 }} />
+                )}
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={task.postCustomization.addSourceLink.enabled}
+                  onChange={(e) => handleToggleCustomization('addSourceLink', e.target.checked)}
+                />
+              }
+              label="Включить добавление ссылки на источник"
+            />
+            
+            {task.postCustomization.addSourceLink.enabled && (
+              <Box sx={{ mt: 2 }}>
+                <TextField
+                  label="Текст перед ссылкой"
+                  value={task.postCustomization.addSourceLink.text}
+                  onChange={(e) => handleNestedCustomizationChange('addSourceLink', 'text', e.target.value)}
+                  fullWidth
+                  placeholder="Например: Источник:"
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  Ссылка на оригинальный пост будет добавлена автоматически после этого текста
+                </Typography>
+              </Box>
+            )}
+          </AccordionDetails>
+        </Accordion>
+        
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <CreateIcon sx={{ mr: 1, color: task.postCustomization.addSignature.enabled ? 'primary.main' : 'text.secondary' }} />
+              <Typography>
+                Добавить подпись
+                {task.postCustomization.addSignature.enabled && (
+                  <Chip size="small" color="primary" variant="outlined" label="Включено" sx={{ ml: 1 }} />
+                )}
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={task.postCustomization.addSignature.enabled}
+                  onChange={(e) => handleToggleCustomization('addSignature', e.target.checked)}
+                />
+              }
+              label="Включить добавление подписи"
+            />
+            
+            {task.postCustomization.addSignature.enabled && (
+              <Box sx={{ mt: 2 }}>
+                <TextField
+                  label="Текст подписи"
+                  value={task.postCustomization.addSignature.text}
+                  onChange={(e) => handleNestedCustomizationChange('addSignature', 'text', e.target.value)}
+                  fullWidth
+                  placeholder="Например: С уважением, команда проекта"
+                  helperText="Этот текст будет добавлен в самом конце поста"
+                />
+              </Box>
+            )}
+          </AccordionDetails>
+        </Accordion>
       </Paper>
       
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>

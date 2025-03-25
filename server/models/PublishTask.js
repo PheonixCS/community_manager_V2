@@ -119,6 +119,81 @@ const PublishTaskSchema = new Schema({
     }
   },
   
+  // Настройки кастомизации постов
+  postCustomization: {
+    // Добавить дополнительный текст к посту
+    addText: {
+      // Флаг активации
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      // Позиция текста (вначале/вконце)
+      position: {
+        type: String,
+        enum: ['before', 'after'],
+        default: 'after'
+      },
+      // Сам текст
+      text: {
+        type: String,
+        default: ''
+      }
+    },
+    // Добавить изображение к посту
+    addImage: {
+      // Флаг активации
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      // URL изображения или S3-ключ
+      imageUrl: {
+        type: String,
+        default: ''
+      }
+    },
+    // Добавить хэштеги
+    addHashtags: {
+      // Флаг активации
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      // Список хэштегов
+      hashtags: {
+        type: String,
+        default: ''
+      }
+    },
+    // Добавить ссылку на источник
+    addSourceLink: {
+      // Флаг активации
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      // Текст для ссылки
+      text: {
+        type: String,
+        default: 'Источник: '
+      }
+    },
+    // Добавить подпись снизу (например, авторство)
+    addSignature: {
+      // Флаг активации
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      // Текст подписи
+      text: {
+        type: String,
+        default: ''
+      }
+    }
+  },
+  
   // Статистика
   statistics: {
     // Общее количество выполнений
