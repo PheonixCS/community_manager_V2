@@ -193,7 +193,17 @@ class VkPostingService {
       // 4. Публикуем пост через VK API
       const result = await this.makeWallPostRequest(postData, token);
       
-      // 5. Обновляем информацию о посте в базе данных только если пост был из БД
+      // 5. Если опция pinned установлена, закрепляем пост
+      if (options.pinned) {
+        try {
+          await this.pinPost(result.post_id, communityId, token);
+        } catch (pinError) {
+          console.error(`Error pinning post ${result.post_id}:`, pinError);
+          // Не прерываем процесс, если закрепление не удалось
+        }
+      }
+      
+      // 6. Обновляем информацию о посте в базе данных только если пост был из БД
       // (идентифицируем это наличием метода save)
       if (postId) {
         // Получаем оригинальный пост из базы если нам передали объект с модификациями
@@ -261,7 +271,17 @@ class VkPostingService {
       // 4. Публикуем пост через VK API
       const result = await this.makeWallPostRequest(publishData, token);
       
-      // 5. Если нужно сохранить сгенерированный пост в базу, делаем это здесь
+      // 5. Если опция pinned установлена, закрепляем пост
+      if (options.pinned) {
+        try {
+          await this.pinPost(result.post_id, communityId, token);
+        } catch (pinError) {
+          console.error(`Error pinning post ${result.post_id}:`, pinError);
+          // Не прерываем процесс, если закрепление не удалось
+        }
+      }
+      
+      // 6. Если нужно сохранить сгенерированный пост в базу, делаем это здесь
       let savedPost = null;
       if (options.saveToDatabase) {
         savedPost = await this.saveGeneratedPostToDatabase(
@@ -495,10 +515,11 @@ class VkPostingService {
       result.from_group = 1;
     }
     
-    // Закрепить пост (1 - закрепить)
-    if (options.pinned) {
-      result.pinned = 1;
-    }
+    // Закрепить пост - сохраняем это значение, но применяем отдельно
+    // через wall.pin после публикации поста
+    // if (options.pinned) {
+    //   result.pinned = 1;
+    // }
     
     // Добавить геолокацию
     if (options.lat && options.long) {
@@ -548,6 +569,11 @@ class VkPostingService {
         }
       }
       
+      // Remove the pinned parameter - we'll handle pinning separately
+      if (formData.has('pinned')) {
+        formData.delete('pinned');
+      }
+      
       // Make POST request with form data in body instead of URL parameters
       const response = await axios.post('https://api.vk.com/method/wall.post', formData, {
         headers: {
@@ -587,6 +613,42 @@ class VkPostingService {
       }
       
       throw error;
+    }
+  }
+
+  /**
+   * Закрепляет пост на стене сообщества
+   * @param {string} postId - ID поста в формате VK (числовой ID)
+   * @param {string} communityId - ID сообщества (с минусом в начале)
+   * @param {string} token - Токен доступа
+   * @returns {Promise<boolean>} Результат операции
+   */
+  async pinPost(postId, communityId, token) {
+    try {
+      console.log(`Pinning post ${postId} in community ${communityId}`);
+      
+      const formData = new URLSearchParams();
+      formData.append('access_token', token);
+      formData.append('v', '5.131');
+      formData.append('owner_id', communityId);
+      formData.append('post_id', postId);
+      
+      const response = await axios.post('https://api.vk.com/method/wall.pin', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+      
+      if (response.data.error) {
+        console.error('VK API returned an error when pinning post:', response.data.error);
+        throw new Error(`Error pinning post: ${response.data.error.error_msg}`);
+      }
+      
+      console.log(`Successfully pinned post ${postId} in community ${communityId}`);
+      return true;
+    } catch (error) {
+      console.error(`Error pinning post ${postId} in community ${communityId}:`, error);
+      return false;
     }
   }
 
