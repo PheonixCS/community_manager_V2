@@ -158,30 +158,40 @@ class PublishTaskRepository extends BaseRepository {
    * @returns {Promise<Array<Document>>} Массив постов для публикации
    */
   async findBestPostsForPublishing(scrapingTaskIds, limit = 1, minViewRate = 0) {
-    // Получаем все посты из заданий скрапинга
-    const posts = await Post.find({
-      taskId: { $in: scrapingTaskIds },
-      viewRate: { $gte: minViewRate }
-    }).sort({ viewRate: -1 }).limit(limit);
-    
-    // Фильтруем посты, которые уже были опубликованы
-    const unpublishedPosts = [];
-    
-    for (const post of posts) {
-      // Проверяем, есть ли запись в истории публикаций для этого поста
-      const publishHistory = await PublishHistory.findOne({ postId: post._id });
+    try {
+      // 1. Получаем ID постов, которые уже были опубликованы
+      const publishedHistory = await PublishHistory.find({
+        status: 'success'
+      }).select('postId');
       
-      if (!publishHistory) {
-        unpublishedPosts.push(post);
-        
-        // Если достигли нужного количества постов, прекращаем поиск
-        if (unpublishedPosts.length >= limit) {
-          break;
-        }
+      // Извлекаем ID опубликованных постов
+      const publishedPostIds = publishedHistory.map(h => h.postId);
+      
+      console.log(`Found ${publishedPostIds.length} already published posts to exclude`);
+      
+      // 2. Строим запрос с исключением опубликованных постов
+      const query = {
+        taskId: { $in: scrapingTaskIds },
+        viewRate: { $gte: minViewRate }
+      };
+      
+      // Исключаем посты, которые уже были опубликованы
+      if (publishedPostIds.length > 0) {
+        query._id = { $nin: publishedPostIds };
       }
+      
+      // 3. Получаем неопубликованные посты, отсортированные по рейтингу
+      const posts = await Post.find(query)
+        .sort({ viewRate: -1 })
+        .limit(limit);
+      
+      console.log(`Found ${posts.length} unpublished posts for publishing`);
+      
+      return posts;
+    } catch (error) {
+      console.error('Error finding posts for publishing:', error);
+      return [];
     }
-    
-    return unpublishedPosts;
   }
 }
 
