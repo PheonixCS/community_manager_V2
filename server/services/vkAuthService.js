@@ -13,7 +13,7 @@ class VkAuthService {
    * @returns {string} URL для редиректа на страницу авторизации ВК
    */
   getAuthUrl(redirectUri) {
-    const vkAppId = config.vkApi?.appId || this.getAppIdFromSettings();
+    const vkAppId = config.vk.appId || this.getAppIdFromSettings();
     
     if (!vkAppId) {
       throw new Error('VK App ID not configured');
@@ -27,7 +27,10 @@ class VkAuthService {
       'offline'     // Получение refresh token для бессрочного использования
     ].join(',');
     
-    return `https://oauth.vk.com/authorize?client_id=${vkAppId}&display=page&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&v=5.131`;
+    // Log the redirect URI for debugging purposes
+    console.log('Using redirect URI for authorization:', redirectUri);
+    
+    return `https://oauth.vk.com/authorize?client_id=${vkAppId}&display=page&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&v=5.131`;
   }
   
   /**
@@ -52,12 +55,15 @@ class VkAuthService {
    */
   async getTokenByCode(code, redirectUri) {
     try {
-      const appId = config.vkApi?.appId || await this.getAppIdFromSettings();
-      const appSecret = config.vkApi?.appSecret || await this.getAppSecretFromSettings();
+      const appId = config.vk.appId || await this.getAppIdFromSettings();
+      const appSecret = config.vk.appSecret || await this.getAppSecretFromSettings();
       
       if (!appId || !appSecret) {
         throw new Error('VK App ID or Secret not configured');
       }
+      
+      // Log the redirect URI to verify it matches
+      console.log('Using redirect URI for token exchange:', redirectUri);
       
       const response = await axios.get('https://oauth.vk.com/access_token', {
         params: {
@@ -107,6 +113,10 @@ class VkAuthService {
       
     } catch (error) {
       console.error('Error getting token by code:', error);
+      // Log response data if available for better debugging
+      if (error.response?.data) {
+        console.error('Error response data:', error.response.data);
+      }
       throw error;
     }
   }

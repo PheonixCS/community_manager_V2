@@ -1,12 +1,18 @@
 const path = require('path');
 
+// VK API configuration
+const vkConfig = {
+  appId: process.env.VK_APP_ID || '52750600',
+  appSecret: process.env.VK_APP_SECRET || '6IXAcrW9vfarh8sncrTi',
+  redirectUri: process.env.VK_REDIRECT_URI || 'https://krazu-group.tech/api/vk-auth/callback',
+  token: process.env.VK_TOKEN,
+  apiVersion: '5.131'
+};
+
 module.exports = {
   port: process.env.PORT || 5000,
   mongoURI: process.env.MONGO_URI || 'mongodb://localhost:27017/vk_scraper',
-  vk: {
-    serviceKey: '', // Будем брать из базы
-    apiVersion: process.env.VK_API_VERSION || '5.131'
-  },
+  vk: vkConfig,
   vkApi: {
     // ID приложения ВКонтакте
     appId: 52750600,

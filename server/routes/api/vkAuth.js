@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const vkAuthService = require('../../services/vkAuthService');
+const config = require('../../config');
 
 /**
  * Получение URL для авторизации в ВК
@@ -8,10 +9,8 @@ const vkAuthService = require('../../services/vkAuthService');
  */
 router.get('/auth-url', (req, res) => {
   try {
-    // В продакшене нужно получать хост из заголовков или конфига
-    const protocol = req.secure ? 'https' : 'http';
-    const host = req.get('host');
-    const redirectUri = `https://${host}/api/vk-auth/callback`;
+    // Get the correct redirect URI from configuration or environment
+    const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
     
     const authUrl = vkAuthService.getAuthUrl(redirectUri);
     res.json({ authUrl });
@@ -33,10 +32,8 @@ router.get('/callback', async (req, res) => {
       throw new Error('Authorization code not provided');
     }
     
-    // Получаем хост для redirectUri (должен совпадать с тем, что был при запросе авторизации)
-    const protocol = req.secure ? 'https' : 'http';
-    const host = req.get('host');
-    const redirectUri = `${protocol}://${host}/api/vk-auth/callback`;
+    // Use the exact same redirect URI as in the auth URL request
+    const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
     
     // Получаем токен по коду
     const result = await vkAuthService.getTokenByCode(code, redirectUri);

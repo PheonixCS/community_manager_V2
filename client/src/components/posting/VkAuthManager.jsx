@@ -56,6 +56,9 @@ const VkAuthManager = () => {
     try {
       const response = await axios.get('/api/vk-auth/auth-url');
       setAuthUrl(response.data.authUrl);
+      
+      // Log the auth URL to help with debugging
+      console.log('Received VK auth URL:', response.data.authUrl);
     } catch (error) {
       console.error('Error fetching auth URL:', error);
       showSnackbar('Ошибка при получении URL авторизации', 'error');
@@ -159,6 +162,25 @@ const VkAuthManager = () => {
     }
   };
 
+  const handleAuthButtonClick = () => {
+    if (!authUrl) {
+      showSnackbar('URL авторизации не получен. Попробуйте обновить страницу.', 'error');
+      return;
+    }
+    
+    // Open the auth URL in a new window
+    const authWindow = window.open(authUrl, 'VK Authorization', 'width=800,height=600');
+    
+    // Poll for the window to close
+    const checkWindowClosed = setInterval(() => {
+      if (authWindow.closed) {
+        clearInterval(checkWindowClosed);
+        // Refresh tokens after window closes
+        fetchTokens();
+      }
+    }, 1000);
+  };
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -170,8 +192,7 @@ const VkAuthManager = () => {
             variant="contained" 
             color="primary" 
             startIcon={<KeyIcon />}
-            href={authUrl}
-            target="_blank"
+            onClick={handleAuthButtonClick}
             disabled={!authUrl}
             sx={{ mr: 2 }}
           >
