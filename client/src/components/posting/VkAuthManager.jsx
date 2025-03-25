@@ -216,6 +216,7 @@ const VkAuthManager = () => {
           </Typography>
           <Typography variant="body1" paragraph>
             Для публикации постов необходим активный токен пользователя ВКонтакте.
+            <strong> Публикация через сервисный токен невозможна!</strong>
           </Typography>
           <Typography variant="body1" paragraph>
             1. Нажмите кнопку "Новая авторизация"
@@ -229,6 +230,11 @@ const VkAuthManager = () => {
           <Typography variant="body1">
             Токен будет автоматически обновляться системой, пока у приложения есть доступ к вашему аккаунту.
           </Typography>
+          {tokens.length === 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              У вас нет активных токенов. Без токена публикация постов невозможна!
+            </Alert>
+          )}
         </CardContent>
       </Card>
       

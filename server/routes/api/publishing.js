@@ -208,38 +208,64 @@ router.post('/publish-post', async (req, res) => {
     }
     
     const vkPostingService = require('../../services/vkPostingService');
-    const result = await vkPostingService.publishExistingPost(
-      postId, 
-      formattedCommunityId, 
-      options
-    );
     
-    if (result.status === 'error') {
-      return res.status(400).json(result);
-    }
-    
-    // Сохраняем историю публикации
     try {
-      const post = await require('mongoose').model('Post').findById(postId);
+      const result = await vkPostingService.publishExistingPost(
+        postId, 
+        formattedCommunityId, 
+        options
+      );
       
-      if (post) {
-        await publishTaskRepository.savePublishHistory({
-          sourcePostId: post.postId,
-          postId: post._id,
-          sourceGroupId: post.communityId,
-          targetGroupId: formattedCommunityId,
-          targetPostId: result.postId || 'manual_publish',
-          targetPostUrl: result.vkUrl || '',
-          publishedAt: new Date(),
-          status: 'success'
-        });
+      if (result.status === 'error') {
+        return res.status(400).json(result);
       }
-    } catch (historyError) {
-      console.error('Error saving publish history:', historyError);
-      // We still return success even if history saving fails
+      
+      // Сохраняем историю публикации
+      try {
+        const post = await require('mongoose').model('Post').findById(postId);
+        
+        if (post) {
+          await publishTaskRepository.savePublishHistory({
+            sourcePostId: post.postId,
+            postId: post._id,
+            sourceGroupId: post.communityId,
+            targetGroupId: formattedCommunityId,
+            targetPostId: result.postId || 'manual_publish',
+            targetPostUrl: result.vkUrl || '',
+            publishedAt: new Date(),
+            status: 'success'
+          });
+        }
+      } catch (historyError) {
+        console.error('Error saving publish history:', historyError);
+        // We still return success even if history saving fails
+      }
+      
+      res.json(result);
+    } catch (vkError) {
+      // Проверяем, есть ли активные токены и даем соответствующую подсказку
+      let errorMessage = vkError.message;
+      
+      // Проверяем наличие активных токенов, если ошибка связана с авторизацией
+      if (errorMessage.includes('токен') || errorMessage.includes('авторизоваться')) {
+        try {
+          const vkAuthService = require('../../services/vkAuthService');
+          const tokens = await vkAuthService.getAllTokens();
+          const hasActiveTokens = tokens.some(token => token.isActive);
+          
+          if (!hasActiveTokens) {
+            errorMessage = 'Для публикации постов необходимо авторизоваться в ВКонтакте. Перейдите в раздел "Авторизация ВКонтакте".';
+          }
+        } catch (tokenError) {
+          console.error('Error checking tokens:', tokenError);
+        }
+      }
+      
+      return res.status(400).json({
+        status: 'error',
+        error: errorMessage
+      });
     }
-    
-    res.json(result);
   } catch (error) {
     console.error('Error publishing post:', error);
     res.status(500).json({

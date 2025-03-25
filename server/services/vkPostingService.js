@@ -25,20 +25,12 @@ class VkPostingService {
         return userToken.accessToken;
       }
       
-      // Если нет пользовательского токена, пытаемся использовать токен из настроек или конфигурации
-      console.warn('No active user token found, trying to use token from config');
-      
-      // Получаем токен из конфигурации
-      const serviceToken = config.vk.token || config.vkApi.serviceToken;
-      
-      if (!serviceToken) {
-        throw new Error('No user tokens available and no service token in config');
-      }
-      
-      return serviceToken;
+      // Если дошли до этой точки, значит пользовательский токен не найден
+      // При публикации постов сервисный токен НЕ годится - нужен только токен пользователя
+      throw new Error('Не найден активный пользовательский токен ВКонтакте. Необходимо авторизоваться в ВКонтакте через раздел "Авторизация ВКонтакте".');
     } catch (error) {
       console.error('Error getting VK publish token:', error);
-      return null;
+      throw error; // Пробрасываем ошибку дальше, чтобы показать пользователю
     }
   }
 

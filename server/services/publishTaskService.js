@@ -214,6 +214,12 @@ class PublishTaskService {
         } catch (error) {
           console.error(`Error publishing post ${post._id} to group ${targetGroup.groupId}:`, error);
           
+          // Добавляем дополнительное сообщение, если ошибка связана с отсутствием токена
+          let errorMessage = error.message;
+          if (error.message.includes('токен') || error.message.includes('авторизоваться')) {
+            errorMessage += ' Перейдите в раздел "Авторизация ВКонтакте" для добавления токена.';
+          }
+          
           // Save error information (with error handling)
           try {
             await publishTaskRepository.savePublishHistory({
@@ -225,7 +231,7 @@ class PublishTaskService {
               publishTaskId: task._id,
               status: 'failed',
               targetPostId: 'error', // Add this to prevent validation errors
-              errorMessage: error.message || 'Unknown error'
+              errorMessage: errorMessage
             });
           } catch (historyError) {
             console.error('Failed to save error history:', historyError);
