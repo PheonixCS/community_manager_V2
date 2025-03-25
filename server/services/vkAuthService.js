@@ -24,7 +24,7 @@ class VkAuthService {
     
     // Определяем конкретные права доступа, которые нам нужны
     // Используем константный формат scope, как в документации VK API
-    const scopeValue = "wall,photos,groups,video,offline,pages,docs,manage";
+    const scopeValue = "wall,photos,groups,video,offline,docs";
     
     console.log(`Creating VK auth URL with scope: ${scopeValue}`);
     console.log('Using redirect URI for authorization:', redirectUri);
