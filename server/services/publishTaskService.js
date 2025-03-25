@@ -219,7 +219,7 @@ class PublishTaskService {
       
       // Check if token has proper permissions
       const hasProperToken = activeTokens.some(t => 
-        t.scope && t.scope.includes('wall') && t.scope.includes('manage')
+        t.scope && t.scope.includes('wall')
       );
       
       if (!hasProperToken) {
