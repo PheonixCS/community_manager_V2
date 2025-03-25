@@ -374,11 +374,24 @@ class VkPostingService {
         has_attachments: !!postData.attachments
       });
       
-      const response = await axios.post('https://api.vk.com/method/wall.post', null, {
-        params: {
-          ...postData,
-          access_token: token,
-          v: '5.131'
+      // Instead of passing everything as URL parameters, create form data for the body
+      const formData = new URLSearchParams();
+      
+      // Add access token and API version to form data
+      formData.append('access_token', token);
+      formData.append('v', '5.131');
+      
+      // Add all post data parameters to form data
+      for (const [key, value] of Object.entries(postData)) {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value);
+        }
+      }
+      
+      // Make POST request with form data in body instead of URL parameters
+      const response = await axios.post('https://api.vk.com/method/wall.post', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
       
