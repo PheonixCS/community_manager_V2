@@ -296,6 +296,33 @@ async getTokenByCode(code, state, redirectUri) {
 }
 ```
 
+## Device ID Management
+
+VK ID requires handling a device_id parameter during the authorization and token refresh flow:
+
+1. When redirecting to the callback URL, VK ID includes a device_id parameter
+2. This device_id must be saved and used for subsequent token refresh operations
+3. The deviceId is stored with the token in our database
+
+The implementation captures the device_id like this:
+
+```javascript
+// In callback handler
+const { code, state, device_id } = req.query;
+
+// Pass to token exchange
+const result = await vkAuthService.getTokenByCode(code, state, redirectUri, device_id);
+
+// In token exchange
+const deviceId = device_id || 'web_default_device';
+formData.append('device_id', deviceId);
+
+// In token refresh
+formData.append('device_id', token.deviceId || 'web_default_device');
+```
+
+This ensures proper device tracking for VK ID's security requirements.
+
 ### Security Considerations
 
 - In production, it's recommended to use the S256 method for code challenge generation, which involves SHA-256 hashing

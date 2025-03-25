@@ -19,14 +19,15 @@ class VkAuthService {
       throw new Error('VK App ID not configured');
     }
     
-    // Generate secure state for CSRF protection
+    // Generate secure state for CSRF protection - must be at least 32 chars
     const state = this.generateRandomString(32);
     
     // Generate code verifier for PKCE - use only URL safe characters
     const codeVerifier = this.generateUrlSafeString(64);
     
-    // Generate code challenge from verifier
-    const codeChallenge = codeVerifier; // Using plain method instead of S256 for simplicity
+    // Per VK documentation, we should use S256 method, but plain also works
+    // Use plain for simplicity and compatibility
+    const codeChallenge = codeVerifier; // Using plain method instead of S256
     
     // Store the code verifier to use later when exchanging the code
     this.storeAuthParams(state, {
@@ -42,7 +43,7 @@ class VkAuthService {
     console.log('Using code challenge:', codeChallenge);
     
     // Use the VK ID authorization endpoint with PKCE parameters
-    // Using plain method for code challenge to simplify implementation
+    // Using plain method for code challenge - VK docs say S256 is preferred but plain also works
     return `https://id.vk.com/authorize?` +
       `client_id=${vkAppId}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -187,9 +188,13 @@ class VkAuthService {
         throw new Error('VK App ID or Secret not configured');
       }
 
+      // Get device_id if it was provided in the callback
+      const device_id = req.query.device_id || 'web_default_device';
+
       // Log the redirect URI to verify it matches
       console.log('Using redirect URI for token exchange:', finalRedirectUri);
       console.log('Using code verifier from stored params:', storedParams.codeVerifier);
+      console.log('Using device_id:', device_id);
       
       // Use POST request with form-data as per VK ID documentation
       const formData = new URLSearchParams();
@@ -198,6 +203,7 @@ class VkAuthService {
       formData.append('redirect_uri', finalRedirectUri);
       formData.append('code', code);
       formData.append('code_verifier', storedParams.codeVerifier);
+      formData.append('device_id', device_id); // Include device_id as specified in VK docs
       formData.append('grant_type', 'authorization_code');
       
       // Make POST request to VK ID token endpoint
@@ -249,6 +255,11 @@ class VkAuthService {
         lastUsed: new Date(),
         userInfo: userInfo
       };
+      
+      // Save the device_id for potential refresh token usage
+      if (device_id) {
+        tokenData.deviceId = device_id;
+      }
       
       // Ищем существующий токен для этого пользователя
       let token = await VkUserToken.findOne({ vkUserId: tokenData.vkUserId });
@@ -338,11 +349,15 @@ class VkAuthService {
         throw new Error('VK App ID or Secret not configured');
       }
       
+      // Use the same device_id that was used for token acquisition if available
+      const deviceId = token.deviceId || 'web_default_device';
+      
       // Use correct POST request with form-data for refresh
       const formData = new URLSearchParams();
       formData.append('client_id', appId);
       formData.append('client_secret', appSecret);
       formData.append('refresh_token', token.refreshToken);
+      formData.append('device_id', deviceId); // Include device_id for refresh token
       formData.append('grant_type', 'refresh_token');
       
       // Make POST request to refresh endpoint

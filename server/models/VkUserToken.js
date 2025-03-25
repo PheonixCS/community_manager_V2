@@ -56,6 +56,11 @@ const VkUserTokenSchema = new Schema({
   // Информация о пользователе ВК 
   userInfo: {
     type: Schema.Types.Mixed
+  },
+  
+  // Device ID for token refresh operations with VK ID
+  deviceId: {
+    type: String
   }
 }, { 
   timestamps: true 

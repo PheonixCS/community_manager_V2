@@ -32,10 +32,16 @@ class VkAuthController {
    */
   async handleCallback(req, res) {
     try {
-      const { code, state, error, error_description, error_code, additional_data } = req.query;
+      const { code, state, device_id, error, error_description, error_code, additional_data } = req.query;
       
       // Log the incoming request parameters
       console.log('VK auth callback received with params:', req.query);
+      
+      // Extract and save device_id as per VK ID docs
+      if (device_id) {
+        console.log('Received device_id:', device_id);
+        // Store device_id somewhere for further usage with this user session
+      }
       
       // Check for errors from VK ID
       if (error) {
@@ -66,8 +72,8 @@ class VkAuthController {
       // Use the exact same redirect URI as in the auth URL request
       const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
       
-      // Pass the state to token exchange to validate it and retrieve stored params
-      const result = await vkAuthService.getTokenByCode(code, state, redirectUri);
+      // Pass the code, state, device_id and redirect URI to token exchange
+      const result = await vkAuthService.getTokenByCode(code, state, redirectUri, device_id);
       
       // Log the received token scope for debugging
       console.log('Received token with scope:', result.token.scope);

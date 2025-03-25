@@ -34,7 +34,8 @@ const VkAuthManager = () => {
   useEffect(() => {
     const initData = async () => {
       await fetchTokens();
-      // We'll fetch the auth URL only when needed, not on initial load
+      // We need to fetch the auth URL on component mount for button activation
+      await fetchAuthUrl();
     };
     
     initData();
@@ -154,22 +155,21 @@ const VkAuthManager = () => {
     // Clear previous auth errors if any
     setPkceError(null);
     
-    // First fetch the auth URL right when the button is clicked
-    // instead of on page load to avoid stale auth params
+    // Show the important warning right away
+    showSnackbar('ВАЖНО! Необходимо разрешить ВСЕ запрашиваемые права доступа для корректной работы приложения!', 'warning');
+    
+    // Get fresh auth URL at the time of the click
     axios.get('/api/vk-auth/auth-url')
       .then(response => {
         const authUrl = response.data.authUrl;
         console.log('Fetched fresh VK auth URL:', authUrl);
         
         if (!authUrl) {
-          showSnackbar('URL авторизации не получен. Попробуйте обновить страницу.', 'error');
+          showSnackbar('Ошибка получения URL авторизации. Попробуйте обновить страницу.', 'error');
           return;
         }
         
-        // Показываем важное предупреждение пользователю
-        showSnackbar('ВАЖНО! Необходимо разрешить ВСЕ запрашиваемые права доступа для корректной работы приложения!', 'warning');
-        
-        // Открываем окно авторизации достаточно большого размера
+        // Open the authorization window with the fresh URL
         const authWindow = window.open(
           authUrl, 
           'VK Authorization', 
@@ -243,7 +243,7 @@ const VkAuthManager = () => {
             color="primary" 
             startIcon={<KeyIcon />}
             onClick={handleAuthButtonClick}
-            disabled={!authUrl}
+            // Remove the disabled condition so the button is always clickable
             sx={{ mr: 2 }}
           >
             Новая авторизация
