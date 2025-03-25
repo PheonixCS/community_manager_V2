@@ -15,6 +15,12 @@ router.get('/auth-url', vkAuthController.generateAuthUrl);
 router.get('/callback', vkAuthController.handleCallback);
 
 /**
+ * Exchange authorization code for token
+ * POST /api/vk-auth/exchange-token
+ */
+router.post('/exchange-token', vkAuthController.exchangeToken);
+
+/**
  * Получение всех токенов пользователей
  * GET /api/vk-auth/tokens
  */

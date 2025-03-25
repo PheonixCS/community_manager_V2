@@ -16,6 +16,13 @@ import {
   Assistant as AssistantIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import { 
+  generateCodeVerifier, 
+  generateCodeChallenge, 
+  storePkceParams,
+  getPkceVerifier,
+  cleanupPkceParams 
+} from '../../utils/pkceUtils';
 
 const VkAuthManager = () => {
   const [tokens, setTokens] = useState([]);
@@ -163,84 +170,156 @@ const VkAuthManager = () => {
     }
   };
 
-  const handleAuthButtonClick = () => {
+  const handleAuthButtonClick = async () => {
     // Clear previous auth errors if any
     setPkceError(null);
     
     // Show the important warning right away
     showSnackbar('ВАЖНО! Необходимо разрешить ВСЕ запрашиваемые права доступа для корректной работы приложения!', 'warning');
     
-    // Get fresh auth URL at the time of the click
-    axios.get('/api/vk-auth/auth-url')
-      .then(response => {
-        const authUrl = response.data.authUrl;
-        console.log('Fetched fresh VK auth URL:', authUrl);
+    try {
+      // Generate PKCE parameters
+      const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+      
+      // Store the code verifier for later use
+      storePkceParams(state, codeVerifier);
+      
+      console.log('Generated PKCE parameters:', {
+        state,
+        codeVerifier: codeVerifier.substring(0, 10) + '...',
+        codeChallenge: codeChallenge.substring(0, 10) + '...'
+      });
+      
+      // Get the VK ID auth URL with our PKCE parameters
+      const response = await axios.get('/api/vk-auth/auth-url', {
+        params: {
+          state,
+          codeChallenge,
+          codeChallengeMethod: 'S256'
+        }
+      });
+      
+      const authUrl = response.data.authUrl;
+      console.log('Fetched VK auth URL with PKCE parameters:', authUrl);
+      
+      if (!authUrl) {
+        showSnackbar('Ошибка получения URL авторизации. Попробуйте обновить страницу.', 'error');
+        return;
+      }
+      
+      // Open the authorization window with the URL
+      const authWindow = window.open(
+        authUrl, 
+        'VK Authorization', 
+        'width=1200,height=800,top=50,left=50,scrollbars=yes,status=yes'
+      );
+      
+      // Monitor auth window and handle result
+      // ...existing code for checking window closure...
+      
+      // Track authorization status
+      let authCheckInterval;
+      let authTimeout;
+    
+      // Add event listener for auth callback
+      window.addEventListener('message', function handleAuthCallback(event) {
+        // Check if the message is from our application and contains auth data
+        if (event.data && event.data.type === 'vk-auth-callback') {
+          // Remove the event listener
+          window.removeEventListener('message', handleAuthCallback);
+          
+          const { code, state: returnedState, device_id } = event.data;
+          
+          // Verify the state parameter matches
+          if (state !== returnedState) {
+            showSnackbar('Ошибка авторизации: несовпадение state параметра.', 'error');
+            if (authWindow && !authWindow.closed) {
+              authWindow.close();
+            }
+            return;
+          }
+          
+          // Get the code verifier
+          const verifier = getPkceVerifier(returnedState);
+          if (!verifier) {
+            showSnackbar('Ошибка авторизации: невозможно найти code verifier. Возможно, истек срок действия сессии.', 'error');
+            if (authWindow && !authWindow.closed) {
+              authWindow.close();
+            }
+            return;
+          }
+          
+          // Exchange code for token on backend
+          axios.post('/api/vk-auth/exchange-token', {
+            code,
+            state: returnedState,
+            codeVerifier: verifier,
+            deviceId: device_id
+          })
+          .then(response => {
+            // Token exchange was successful
+            console.log('Token exchange successful:', response.data);
+            cleanupPkceParams(returnedState);
+            
+            // Handle success...
+            fetchTokens().then(() => {
+              showSnackbar('Авторизация успешно выполнена!', 'success');
+            });
+            
+            if (authWindow && !authWindow.closed) {
+              authWindow.close();
+            }
+          })
+          .catch(error => {
+            console.error('Token exchange error:', error);
+            cleanupPkceParams(returnedState);
+            
+            // Handle the error
+            showSnackbar(`Ошибка получения токена: ${error.response?.data?.error || error.message}`, 'error');
+            
+            if (authWindow && !authWindow.closed) {
+              authWindow.close();
+            }
+          });
+        }
+      });
+      
+      // Check every second if window closed without sending message
+      authCheckInterval = setInterval(() => {
+        if (authWindow && authWindow.closed) {
+          clearInterval(authCheckInterval);
+          clearTimeout(authTimeout);
+          window.removeEventListener('message', handleAuthCallback);
+          
+          // Clean up PKCE params
+          cleanupPkceParams(state);
+          
+          // Reload token list
+          fetchTokens();
+        }
+      }, 1000);
+      
+      // Set a timeout for the whole operation
+      authTimeout = setTimeout(() => {
+        clearInterval(authCheckInterval);
+        window.removeEventListener('message', handleAuthCallback);
         
-        if (!authUrl) {
-          showSnackbar('Ошибка получения URL авторизации. Попробуйте обновить страницу.', 'error');
-          return;
+        if (authWindow && !authWindow.closed) {
+          authWindow.close();
         }
         
-        // Open the authorization window with the fresh URL
-        const authWindow = window.open(
-          authUrl, 
-          'VK Authorization', 
-          'width=1200,height=800,top=50,left=50,scrollbars=yes,status=yes'
-        );
+        // Clean up PKCE params
+        cleanupPkceParams(state);
         
-        // Track authorization status
-        let authCheckInterval;
-        let authTimeout;
+        showSnackbar('Время авторизации истекло. Попробуйте снова.', 'error');
+      }, 300000); // 5 minutes timeout
       
-        // Check every second if window closed
-        authCheckInterval = setInterval(() => {
-          if (authWindow && authWindow.closed) {
-            clearInterval(authCheckInterval);
-            clearTimeout(authTimeout);
-            
-            // Reload token list
-            fetchTokens().then(() => {
-              // Rest of the handler
-              if (tokens.length > 0) {
-                const latestToken = tokens[0];
-                const criticalScopes = ['wall', 'photos', 'groups', 'manage'];
-                const missingScopes = criticalScopes.filter(
-                  scope => !latestToken.scope.includes(scope)
-                );
-                
-                if (missingScopes.length > 0) {
-                  showSnackbar(
-                    `Токен получен, но отсутствуют важные разрешения: ${missingScopes.join(', ')}. Рекомендуется удалить токен и авторизоваться снова.`,
-                    'error'
-                  );
-                } else {
-                  showSnackbar('Авторизация успешно выполнена! Все необходимые разрешения получены.', 'success');
-                }
-              } else {
-                // Check if we had a PKCE error
-                if (pkceError) {
-                  showSnackbar(`Ошибка авторизации: ${pkceError}. Попробуйте очистить cookies и кэш браузера.`, 'error');
-                } else {
-                  showSnackbar('Не удалось получить токен. Попробуйте авторизоваться снова.', 'error');
-                }
-              }
-            });
-          }
-        }, 1000);
-        
-        // Set a timeout for the whole operation
-        authTimeout = setTimeout(() => {
-          clearInterval(authCheckInterval);
-          if (authWindow && !authWindow.closed) {
-            authWindow.close();
-          }
-          showSnackbar('Время авторизации истекло. Попробуйте снова.', 'error');
-        }, 300000); // 5 minutes timeout
-      })
-      .catch(error => {
-        console.error('Error fetching auth URL:', error);
-        showSnackbar('Ошибка при получении URL авторизации', 'error');
-      });
+    } catch (error) {
+      console.error('Error starting auth process:', error);
+      showSnackbar('Ошибка при инициализации авторизации', 'error');
+    }
   };
 
   return (

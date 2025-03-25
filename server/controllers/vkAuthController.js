@@ -11,14 +11,40 @@ class VkAuthController {
    */
   generateAuthUrl(req, res) {
     try {
-      // Get the correct redirect URI from configuration or environment
-      const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
+      // Get the PKCE parameters from the frontend
+      const { state, codeChallenge, codeChallengeMethod } = req.query;
       
-      // Generate auth URL with PKCE implementation
-      const authUrl = vkAuthService.getAuthUrl(redirectUri);
+      if (!state || !codeChallenge) {
+        return res.status(400).json({ 
+          error: 'Missing required PKCE parameters: state and codeChallenge are required'
+        });
+      }
+      
+      // Get the correct redirect URI from configuration
+      const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
+      const vkAppId = config.vk.appId;
+      
+      if (!vkAppId) {
+        throw new Error('VK App ID not configured');
+      }
+      
+      // Define required scopes for VK ID
+      const scopeValue = "wall,photos,groups,video,offline,docs,manage";
+      
+      // Build the auth URL with frontend-provided PKCE parameters
+      const authUrl = `https://id.vk.com/authorize?` +
+        `client_id=${vkAppId}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&display=page` +
+        `&scope=${scopeValue}` +
+        `&response_type=code` +
+        `&state=${state}` + 
+        `&code_challenge=${codeChallenge}` +
+        `&code_challenge_method=${codeChallengeMethod || 'S256'}` +
+        `&v=5.131`;
       
       // Log the complete URL for debugging
-      console.log('Generated complete VK auth URL:', authUrl);
+      console.log('Generated VK auth URL with frontend PKCE parameters:', authUrl);
       
       res.json({ authUrl });
     } catch (error) {
@@ -28,84 +54,132 @@ class VkAuthController {
   }
 
   /**
-   * Handle the VK auth callback
+   * Handle the VK auth callback and pass data to frontend
    */
   async handleCallback(req, res) {
     try {
-      const { code, state, device_id, error, error_description, error_code, additional_data } = req.query;
+      const { code, state, device_id, error, error_description } = req.query;
       
       // Log the incoming request parameters
       console.log('VK auth callback received with params:', req.query);
       
-      // Extract and save device_id as per VK ID docs
-      if (device_id) {
-        console.log('Received device_id:', device_id);
-        // Store device_id somewhere for further usage with this user session
-      }
-      
-      // Check for errors from VK ID
+      // Handle errors
       if (error) {
         console.error('VK auth error:', error, error_description);
-        console.error('Error code:', error_code);
-        console.error('Additional data:', additional_data);
         
-        // Handle PKCE specific errors
-        if (error === 'invalid_request' && error_description?.includes('code_challenge')) {
-          return res.status(400).json({ 
-            error: 'PKCE authentication failed. The authorization code challenge is invalid or missing.',
-            details: error_description,
-            suggestion: 'Please try again. We have updated our authentication method to be more compatible with VK ID.'
-          });
-        }
-        
-        return res.status(400).json({ 
-          error: error_description || error,
-          errorCode: error_code,
-          additionalData: additional_data
-        });
+        // Instead of responding with JSON, redirect with error or render HTML with script
+        res.send(`
+          <html>
+          <head><title>Authorization Callback</title></head>
+          <body>
+            <script>
+              window.opener.postMessage({
+                type: 'vk-auth-callback',
+                error: "${error}",
+                errorDescription: "${error_description || ''}",
+              }, "*");
+              window.close();
+            </script>
+            <p>Please close this window and return to the application.</p>
+          </body>
+          </html>
+        `);
+        return;
       }
       
       if (!code) {
-        throw new Error('Authorization code not provided');
+        res.send(`
+          <html>
+          <head><title>Authorization Callback</title></head>
+          <body>
+            <script>
+              window.opener.postMessage({
+                type: 'vk-auth-callback',
+                error: "missing_code",
+                errorDescription: "Authorization code not provided"
+              }, "*");
+              window.close();
+            </script>
+            <p>Please close this window and return to the application.</p>
+          </body>
+          </html>
+        `);
+        return;
       }
       
-      // Use the exact same redirect URI as in the auth URL request
+      // Send the code, state, and device_id back to the frontend to continue the flow
+      res.send(`
+        <html>
+        <head><title>Authorization Callback</title></head>
+        <body>
+          <script>
+            window.opener.postMessage({
+              type: 'vk-auth-callback',
+              code: "${code}",
+              state: "${state}",
+              device_id: "${device_id || ''}"
+            }, "*");
+            window.close();
+          </script>
+          <p>Authorization successful. Please close this window and return to the application.</p>
+        </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error('Error processing auth callback:', error);
+      
+      res.send(`
+        <html>
+        <head><title>Authorization Callback</title></head>
+        <body>
+          <script>
+            window.opener.postMessage({
+              type: 'vk-auth-callback',
+              error: "server_error",
+              errorDescription: "${error.message}"
+            }, "*");
+            window.close();
+          </script>
+          <p>An error occurred. Please close this window and try again.</p>
+        </body>
+        </html>
+      `);
+    }
+  }
+
+  /**
+   * Exchange the authorization code for a token
+   */
+  async exchangeToken(req, res) {
+    try {
+      const { code, state, codeVerifier, deviceId } = req.body;
+      
+      if (!code || !state || !codeVerifier) {
+        return res.status(400).json({
+          error: 'Missing required parameters. Code, state, and codeVerifier are required.'
+        });
+      }
+      
+      // Use the configured redirect URI
       const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
       
-      // Pass the code, state, device_id and redirect URI to token exchange
-      const result = await vkAuthService.getTokenByCode(code, state, redirectUri, device_id);
+      // Exchange the code for token
+      const result = await vkAuthService.exchangeTokenWithVerifier(
+        code, 
+        redirectUri, 
+        codeVerifier, 
+        deviceId
+      );
       
-      // Log the received token scope for debugging
-      console.log('Received token with scope:', result.token.scope);
-      
-      // Special handling for token without critical permissions
-      const criticalScopes = ['wall', 'photos', 'groups', 'manage'];
-      const missingScopes = criticalScopes.filter(scope => !result.token.scope.includes(scope));
-      
-      if (missingScopes.length > 0) {
-        console.warn(`Token is missing critical permissions: ${missingScopes.join(', ')}`);
-      }
-      
-      // Return success response with token information
+      // Return result
       res.json({
         status: 'success',
         message: 'Authorization successful',
         user: result.user,
-        scope: result.token.scope,
-        missingScopes: missingScopes.length > 0 ? missingScopes : null
+        scope: result.token.scope
       });
     } catch (error) {
-      console.error('Error processing auth callback:', error);
-      
-      // Provide more specific error message for auth issues
-      if (error.message.includes('state parameter') || error.message.includes('code_verifier')) {
-        return res.status(400).json({
-          error: error.message,
-          details: 'The authentication session may have expired or been tampered with.',
-          suggestion: 'Please try authenticating again from the beginning.'
-        });
-      }
-      
+      console.error('Error exchanging token:', error);
       res.status(500).json({ error: error.message });
     }
   }

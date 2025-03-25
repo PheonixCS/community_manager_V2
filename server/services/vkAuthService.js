@@ -636,6 +636,112 @@ class VkAuthService {
     
     return scopes;
   }
+
+  /**
+   * Exchange authorization code for token using PKCE
+   * @param {string} code - Authorization code from VK
+   * @param {string} redirectUri - Redirect URI used for authorization
+   * @param {string} codeVerifier - PKCE code verifier from frontend
+   * @param {string} deviceId - Device ID for token refresh
+   * @returns {Promise<Object>} Token information and user data
+   */
+  async exchangeTokenWithVerifier(code, redirectUri, codeVerifier, deviceId = 'web_default_device') {
+    try {
+      const appId = config.vk.appId || await this.getAppIdFromSettings();
+      const appSecret = config.vk.appSecret || await this.getAppSecretFromSettings();
+      
+      if (!appId || !appSecret) {
+        throw new Error('VK App ID or Secret not configured');
+      }
+      
+      console.log('Exchanging code for token with the following parameters:');
+      console.log('- Redirect URI:', redirectUri);
+      console.log('- Code verifier length:', codeVerifier?.length);
+      console.log('- Device ID:', deviceId);
+      
+      // Prepare form data for the token request
+      const formData = new URLSearchParams();
+      formData.append('client_id', appId);
+      formData.append('client_secret', appSecret);
+      formData.append('redirect_uri', redirectUri);
+      formData.append('code', code);
+      formData.append('code_verifier', codeVerifier);
+      formData.append('device_id', deviceId);
+      formData.append('grant_type', 'authorization_code');
+      
+      // Make token request to VK ID
+      const response = await axios.post('https://id.vk.com/oauth2/auth', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+      
+      if (response.data.error) {
+        throw new Error(`VK API Error: ${response.data.error_description || response.data.error}`);
+      }
+      
+      console.log("Raw token response:", JSON.stringify(response.data));
+      
+      // Get user info
+      const userInfo = await this.getUserInfo(response.data.access_token);
+      
+      // Extract scope from response with fallback
+      let tokenScopes = [];
+      if (response.data.scope) {
+        // Handle different scope formats
+        if (typeof response.data.scope === 'string') {
+          tokenScopes = response.data.scope.split(',');
+        } 
+        else if (typeof response.data.scope === 'number') {
+          tokenScopes = this.decodeBitMaskScopes(response.data.scope);
+        }
+      } else {
+        // Fallback scopes
+        tokenScopes = ["wall", "photos", "groups", "video", "offline", "docs", "manage"];
+      }
+      
+      // Always ensure we have the manage permission
+      if (!tokenScopes.includes('manage')) {
+        tokenScopes.push('manage');
+      }
+      
+      // Create token data
+      const tokenData = {
+        vkUserId: response.data.user_id.toString(),
+        vkUserName: `${userInfo.first_name} ${userInfo.last_name}`,
+        accessToken: response.data.access_token,
+        refreshToken: response.data.refresh_token || null,
+        expiresAt: response.data.expires_in ? Math.floor(Date.now() / 1000) + response.data.expires_in : null,
+        scope: tokenScopes,
+        isActive: true,
+        lastUsed: new Date(),
+        userInfo: userInfo,
+        deviceId: deviceId // Store device ID for refresh operations
+      };
+      
+      // Update or create token in the database
+      let token = await VkUserToken.findOne({ vkUserId: tokenData.vkUserId });
+      
+      if (token) {
+        Object.assign(token, tokenData);
+        await token.save();
+      } else {
+        token = await VkUserToken.create(tokenData);
+      }
+      
+      return {
+        token,
+        user: userInfo
+      };
+    } catch (error) {
+      console.error('Error exchanging token with verifier:', error);
+      // Log response data if available
+      if (error.response?.data) {
+        console.error('Error response data:', error.response.data);
+      }
+      throw error;
+    }
+  }
 }
 
 module.exports = new VkAuthService();
