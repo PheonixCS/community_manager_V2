@@ -1,5 +1,6 @@
+const os = require('os');
 const path = require('path');
-
+const isWindows = os.platform() === 'win32';
 // VK API configuration
 const vkConfig = {
   appId: process.env.VK_APP_ID || '52750600',
@@ -57,7 +58,7 @@ module.exports = {
     version: '5.131'
   },
   ytdlp: {
-    path: path.join(__dirname, '../yt-dlp.exe'), // Используем путь относительно папки config
+    path: isWindows ? path.join(__dirname, '../yt-dlp.exe') : path.join(__dirname, '../yt-dlp'), // Используем путь относительно папки config
     // Используем абсолютный путь для директории загрузок
     downloadDir: path.resolve(__dirname, '../downloads')
   },
