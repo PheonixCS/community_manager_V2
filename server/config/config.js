@@ -5,8 +5,9 @@ const vkConfig = {
   appId: process.env.VK_APP_ID || '52750600',
   appSecret: process.env.VK_APP_SECRET || '6IXAcrW9vfarh8sncrTi',
   redirectUri: process.env.VK_REDIRECT_URI || 'https://krazu-group.tech/api/vk-auth/callback',
-  token: process.env.VK_TOKEN,
-  apiVersion: '5.131'
+  token: process.env.VK_TOKEN || '8642adf18642adf18642adf16f856644f9886428642adf1e100516a63045e8341fbf21a', // Use service token as fallback
+  apiVersion: '5.131',
+  userId: process.env.VK_USER_ID || '123456789' // Add a default user ID (replace with your actual user ID)
 };
 
 module.exports = {

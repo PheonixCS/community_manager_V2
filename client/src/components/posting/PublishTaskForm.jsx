@@ -361,34 +361,55 @@ const PublishTaskForm = () => {
   
   const fetchGroups = async () => {
     try {
+      setGroupsLoading(true); // Add loading state if not already present
+      
       // First try the primary endpoint
       const response = await axios.get('/api/settings/vk-groups');
       
       if (response.data && Array.isArray(response.data) && response.data.length > 0) {
         setAvailableGroups(response.data);
-        console.log('Fetched VK groups:', response.data);
+        console.log('Fetched VK groups from settings:', response.data);
       } else {
         // If primary endpoint returns empty, try alternate endpoint
-        console.log('Primary endpoint returned empty data, trying alternate endpoint');
-        const altResponse = await axios.get('/api/vk/groups');
-        
-        if (altResponse.data && Array.isArray(altResponse.data) && altResponse.data.length > 0) {
-          // Transform data if needed to match expected format
-          const formattedGroups = altResponse.data.map(group => ({
-            id: group.id.toString().startsWith('-') ? group.id.toString() : `-${group.id}`,
-            name: group.name
-          }));
-          setAvailableGroups(formattedGroups);
-          console.log('Fetched VK groups from alternate endpoint:', formattedGroups);
-        } else {
-          // If both endpoints fail, set fallback data
-          console.warn('Both endpoints failed, using fallback data');
+        console.log('Primary endpoint returned empty data, trying VK API endpoint');
+        try {
+          const altResponse = await axios.get('/api/vk/groups');
+          
+          if (altResponse.data && Array.isArray(altResponse.data) && altResponse.data.length > 0) {
+            // Transform data if needed to match expected format
+            const formattedGroups = altResponse.data.map(group => ({
+              id: group.id.toString().startsWith('-') ? group.id.toString() : `-${group.id}`,
+              name: group.name
+            }));
+            setAvailableGroups(formattedGroups);
+            console.log('Fetched VK groups from VK API:', formattedGroups);
+          } else {
+            // If both endpoints fail, set fallback data
+            console.warn('Both endpoints failed, using fallback data');
+            setFallbackGroups();
+          }
+        } catch (vkError) {
+          console.error('Error fetching from VK API:', vkError);
+          // Third attempt - try getting user's tokens and showing a helpful message
+          try {
+            const tokensResponse = await axios.get('/api/vk-auth/tokens');
+            const hasActiveTokens = tokensResponse.data.some(token => token.isActive);
+            
+            if (!hasActiveTokens) {
+              showSnackbar('Для получения списка групп необходимо авторизоваться в ВКонтакте. Перейдите в раздел "Авторизация ВКонтакте"', 'warning');
+            }
+          } catch (tokenError) {
+            console.error('Error checking tokens:', tokenError);
+          }
+          
           setFallbackGroups();
         }
       }
     } catch (error) {
       console.error('Error fetching groups:', error);
       setFallbackGroups();
+    } finally {
+      setGroupsLoading && setGroupsLoading(false);
     }
   };
   
