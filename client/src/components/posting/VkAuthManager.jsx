@@ -178,20 +178,49 @@ const VkAuthManager = () => {
       'width=1200,height=800,top=50,left=50,scrollbars=yes,status=yes'
     );
     
-    // Отслеживаем закрытие окна
-    const checkWindowClosed = setInterval(() => {
+    // Track authorization status
+    let authCheckInterval;
+    let authTimeout;
+  
+    // Check every second if window closed
+    authCheckInterval = setInterval(() => {
       if (authWindow && authWindow.closed) {
-        clearInterval(checkWindowClosed);
+        clearInterval(authCheckInterval);
+        clearTimeout(authTimeout);
         
-        // Перезагружаем список токенов
-        fetchTokens();
-        
-        // Показываем сообщение о необходимости проверить права
-        setTimeout(() => {
-          showSnackbar('Проверьте, что токен получил все необходимые разрешения в таблице ниже', 'info');
-        }, 2000);
+        // Reload token list
+        fetchTokens().then(() => {
+          // Check if new token was received with permissions
+          if (tokens.length > 0) {
+            const latestToken = tokens[0];
+            const criticalScopes = ['wall', 'photos', 'groups', 'manage'];
+            const missingScopes = criticalScopes.filter(
+              scope => !latestToken.scope.includes(scope)
+            );
+            
+            if (missingScopes.length > 0) {
+              showSnackbar(
+                `Токен получен, но отсутствуют важные разрешения: ${missingScopes.join(', ')}. Рекомендуется удалить токен и авторизоваться снова.`,
+                'error'
+              );
+            } else {
+              showSnackbar('Авторизация успешно выполнена! Все необходимые разрешения получены.', 'success');
+            }
+          } else {
+            showSnackbar('Не удалось получить токен. Попробуйте авторизоваться снова.', 'error');
+          }
+        });
       }
     }, 1000);
+    
+    // Set a timeout for the whole operation
+    authTimeout = setTimeout(() => {
+      clearInterval(authCheckInterval);
+      if (authWindow && !authWindow.closed) {
+        authWindow.close();
+      }
+      showSnackbar('Время авторизации истекло. Попробуйте снова.', 'error');
+    }, 300000); // 5 minutes timeout
   };
 
   return (
@@ -249,6 +278,16 @@ const VkAuthManager = () => {
             <Chip label="photos (фотографии)" color="success" variant="outlined" />
             <Chip label="groups (сообщества)" color="success" variant="outlined" />
           </Box>
+          
+          {/* Add information about the new VK ID flow */}
+          <Alert severity="info" sx={{ mt: 2, mb: 2 }}>
+            <Typography variant="subtitle2">Об авторизации VK ID</Typography>
+            <Typography variant="body2">
+              Приложение использует новую систему авторизации VK ID. После авторизации VK ID возвращает набор токенов:
+              Access token (для доступа к API), Refresh token (для обновления доступа) и ID token.
+            </Typography>
+          </Alert>
+          
           <Typography variant="body2" paragraph sx={{ fontStyle: 'italic', mt: 2 }}>
             Запрашиваемые разрешения: доступ к стене, фотографиям, видео, документам, управлению сообществами
           </Typography>

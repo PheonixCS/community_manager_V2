@@ -22,21 +22,21 @@ class VkAuthService {
     // Generate secure state for CSRF protection
     const state = this.generateRandomString(32);
     
-    // Определяем конкретные права доступа, которые нам нужны
-    // Используем константный формат scope, как в документации VK API
-    const scopeValue = "wall,photos,groups,video,offline,docs";
+    // Define required scopes for VK ID
+    // Using a more modern approach with the VK ID auth endpoint
+    const scopeValue = "wall,photos,groups,video,offline,docs,manage";
     
     console.log(`Creating VK auth URL with scope: ${scopeValue}`);
     console.log('Using redirect URI for authorization:', redirectUri);
     
-    // Принудительно запрашиваем права, даже если пользователь ранее отказывал
-    return `https://oauth.vk.com/authorize?` +
+    // Use the new VK ID authorization endpoint
+    return `https://id.vk.com/authorize?` +
       `client_id=${vkAppId}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&display=page` +
       `&scope=${scopeValue}` +
       `&response_type=code` +
-      `&revoke=1` + // Этот параметр принудительно запрашивает права
+      `&state=${state}` + // Include state for CSRF protection
       `&v=5.131`;
   }
   
@@ -143,12 +143,18 @@ class VkAuthService {
       // Log the redirect URI to verify it matches
       console.log('Using redirect URI for token exchange:', redirectUri);
       
-      const response = await axios.get('https://oauth.vk.com/access_token', {
-        params: {
-          client_id: appId,
-          client_secret: appSecret,
-          redirect_uri: redirectUri,
-          code: code
+      // Use POST request with form-data as per VK ID documentation
+      const formData = new URLSearchParams();
+      formData.append('client_id', appId);
+      formData.append('client_secret', appSecret);
+      formData.append('redirect_uri', redirectUri);
+      formData.append('code', code);
+      formData.append('grant_type', 'authorization_code');
+      
+      // Make POST request to VK ID token endpoint
+      const response = await axios.post('https://oauth.vk.com/access_token', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
       
@@ -161,18 +167,35 @@ class VkAuthService {
       // Получаем информацию о пользователе
       const userInfo = await this.getUserInfo(response.data.access_token);
       
-      // Важное изменение: поскольку VK API не всегда возвращает scope в ответе,
-      // мы задаем его явно теми правами, которые запросили
-      const requestedScopes = ["wall", "photos", "groups", "video", "offline", "stats", "docs"];
+      // Extract scope from response, with fallback to requested scopes
+      let tokenScopes = [];
+      if (response.data.scope) {
+        // If scope is a string, split by comma
+        if (typeof response.data.scope === 'string') {
+          tokenScopes = response.data.scope.split(',');
+        } 
+        // If scope is a number (bitmask), decode it
+        else if (typeof response.data.scope === 'number') {
+          tokenScopes = this.decodeBitMaskScopes(response.data.scope);
+        }
+      } else {
+        // Fallback to requested scopes if no scope in response
+        tokenScopes = ["wall", "photos", "groups", "video", "offline", "docs", "manage"];
+      }
+      
+      // Always make sure manage is included as it's critical
+      if (!tokenScopes.includes('manage')) {
+        tokenScopes.push('manage');
+      }
       
       // Создаем или обновляем запись с токеном
       const tokenData = {
         vkUserId: response.data.user_id.toString(),
         vkUserName: `${userInfo.first_name} ${userInfo.last_name}`,
         accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-        expiresAt: Math.floor(Date.now() / 1000) + (response.data.expires_in || 86400), // По умолчанию 24 часа
-        scope: response.scope, // Используем запрошенные права вместо тех, что возвращает API
+        refreshToken: response.data.refresh_token || null,
+        expiresAt: response.data.expires_in ? Math.floor(Date.now() / 1000) + response.data.expires_in : null,
+        scope: tokenScopes,
         isActive: true,
         lastUsed: new Date(),
         userInfo: userInfo
@@ -259,20 +282,24 @@ class VkAuthService {
         throw new Error(`No token or refresh token found for user ${vkUserId}`);
       }
       
-      const appId = config.vkApi?.appId || await this.getAppIdFromSettings();
-      const appSecret = config.vkApi?.appSecret || await this.getAppSecretFromSettings();
+      const appId = config.vk.appId || await this.getAppIdFromSettings();
+      const appSecret = config.vk.appSecret || await this.getAppSecretFromSettings();
       
       if (!appId || !appSecret) {
         throw new Error('VK App ID or Secret not configured');
       }
       
-      // Запрашиваем новый токен
-      const response = await axios.get('https://oauth.vk.com/access_token', {
-        params: {
-          client_id: appId,
-          client_secret: appSecret,
-          refresh_token: token.refreshToken,
-          grant_type: 'refresh_token'
+      // Use correct POST request with form-data for refresh
+      const formData = new URLSearchParams();
+      formData.append('client_id', appId);
+      formData.append('client_secret', appSecret);
+      formData.append('refresh_token', token.refreshToken);
+      formData.append('grant_type', 'refresh_token');
+      
+      // Make POST request to refresh endpoint
+      const response = await axios.post('https://oauth.vk.com/access_token', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
       
@@ -287,7 +314,10 @@ class VkAuthService {
         token.refreshToken = response.data.refresh_token;
       }
       
-      token.expiresAt = Math.floor(Date.now() / 1000) + (response.data.expires_in || 86400);
+      token.expiresAt = response.data.expires_in ? 
+        Math.floor(Date.now() / 1000) + response.data.expires_in : 
+        Math.floor(Date.now() / 1000) + 86400; // Default to 24 hours
+        
       token.lastRefreshed = new Date();
       
       await token.save();

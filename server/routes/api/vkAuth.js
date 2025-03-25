@@ -31,10 +31,17 @@ router.get('/auth-url', (req, res) => {
  */
 router.get('/callback', async (req, res) => {
   try {
-    const { code, state } = req.query;
+    const { code, state, error, error_description } = req.query;
     
     // Log the incoming request parameters
     console.log('VK auth callback received with params:', req.query);
+    
+    // Check for errors from VK ID
+    if (error) {
+      const errorMsg = error_description || error;
+      console.error('VK auth error:', errorMsg);
+      return res.status(400).json({ error: errorMsg });
+    }
     
     if (!code) {
       throw new Error('Authorization code not provided');
@@ -49,12 +56,21 @@ router.get('/callback', async (req, res) => {
     // Log the received token scope for debugging
     console.log('Received token with scope:', result.token.scope);
     
+    // Special handling for token without critical permissions
+    const criticalScopes = ['wall', 'photos', 'groups', 'manage'];
+    const missingScopes = criticalScopes.filter(scope => !result.token.scope.includes(scope));
+    
+    if (missingScopes.length > 0) {
+      console.warn(`Token is missing critical permissions: ${missingScopes.join(', ')}`);
+    }
+    
     // В реальном приложении здесь должно быть перенаправление на фронтенд с сообщением об успехе
     res.json({
       status: 'success',
       message: 'Authorization successful',
       user: result.user,
-      scope: result.token
+      scope: result.token.scope,
+      missingScopes: missingScopes.length > 0 ? missingScopes : null
     });
   } catch (error) {
     console.error('Error processing auth callback:', error);

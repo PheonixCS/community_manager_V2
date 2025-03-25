@@ -8,6 +8,12 @@ const vkConfig = {
   token: process.env.VK_TOKEN || '8642adf18642adf18642adf16f856644f9886428642adf1e100516a63045e8341fbf21a', // Use service token as fallback
   apiVersion: '5.131',
   userId: process.env.VK_USER_ID || '123456789', // Add a default user ID (replace with your actual user ID)
+  // VK ID specific endpoints
+  endpoints: {
+    authorize: 'https://id.vk.com/authorize', // VK ID auth endpoint
+    token: 'https://oauth.vk.com/access_token', // OAuth token endpoint
+    refresh: 'https://oauth.vk.com/access_token' // Same endpoint for refresh
+  },
   // Add a list of scope names to their bit values for conversion
   scopeMappings: {
     'notify': 1,
