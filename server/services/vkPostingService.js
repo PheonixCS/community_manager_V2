@@ -4,6 +4,7 @@ const Post = require('../models/Post');
 const vkApiService = require('./vkApiService');
 const vkAuthService = require('./vkAuthService');
 const { postRepository } = require('../repositories');
+const config = require('../config/config');
 
 /**
  * Сервис для публикации постов в сообщества ВКонтакте
@@ -24,14 +25,17 @@ class VkPostingService {
         return userToken.accessToken;
       }
       
-      // Если нет пользовательского токена, пытаемся использовать токен из настроек
-      // (хотя он, скорее всего, не будет иметь прав на публикацию от имени пользователя)
-      console.warn('No active user token found, trying to use token from settings (may not have publishing rights)');
-      const settings = await Settings.findOne();
-      if (!settings?.vkApi?.publishToken) {
-        throw new Error('No user tokens available and no publish token in settings');
+      // Если нет пользовательского токена, пытаемся использовать токен из настроек или конфигурации
+      console.warn('No active user token found, trying to use token from config');
+      
+      // Получаем токен из конфигурации
+      const serviceToken = config.vk.token || config.vkApi.serviceToken;
+      
+      if (!serviceToken) {
+        throw new Error('No user tokens available and no service token in config');
       }
-      return settings.vkApi.publishToken;
+      
+      return serviceToken;
     } catch (error) {
       console.error('Error getting VK publish token:', error);
       return null;

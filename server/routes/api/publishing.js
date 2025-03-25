@@ -219,19 +219,24 @@ router.post('/publish-post', async (req, res) => {
     }
     
     // Сохраняем историю публикации
-    const post = await require('mongoose').model('Post').findById(postId);
-    
-    if (post) {
-      await publishTaskRepository.savePublishHistory({
-        sourcePostId: post.postId,
-        postId: post._id,
-        sourceGroupId: post.communityId,
-        targetGroupId: formattedCommunityId,
-        targetPostId: result.postId,
-        targetPostUrl: result.vkUrl,
-        publishedAt: new Date(),
-        status: 'success'
-      });
+    try {
+      const post = await require('mongoose').model('Post').findById(postId);
+      
+      if (post) {
+        await publishTaskRepository.savePublishHistory({
+          sourcePostId: post.postId,
+          postId: post._id,
+          sourceGroupId: post.communityId,
+          targetGroupId: formattedCommunityId,
+          targetPostId: result.postId || 'manual_publish',
+          targetPostUrl: result.vkUrl || '',
+          publishedAt: new Date(),
+          status: 'success'
+        });
+      }
+    } catch (historyError) {
+      console.error('Error saving publish history:', historyError);
+      // We still return success even if history saving fails
     }
     
     res.json(result);

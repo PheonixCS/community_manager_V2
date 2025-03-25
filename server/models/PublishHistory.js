@@ -28,8 +28,7 @@ const PublishHistorySchema = new Schema({
   
   // ID опубликованного поста в целевом сообществе
   targetPostId: {
-    type: String,
-    required: true
+    type: String
   },
   
   // URL опубликованного поста

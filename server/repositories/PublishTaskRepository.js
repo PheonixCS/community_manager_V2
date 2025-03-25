@@ -82,12 +82,36 @@ class PublishTaskRepository extends BaseRepository {
   }
 
   /**
-   * Сохранить историю публикации
-   * @param {Object} historyData - Данные для истории публикации
-   * @returns {Promise<Document>} Созданная запись истории
+   * Сохранение истории публикации
+   * @param {Object} historyData - Данные истории публикации
+   * @returns {Promise<Document>} Сохраненная запись истории
    */
   async savePublishHistory(historyData) {
-    return await PublishHistory.create(historyData);
+    try {
+      // Ensure there's a status field
+      if (!historyData.status) {
+        historyData.status = 'success';
+      }
+      
+      // If status is failed but no targetPostId/Url, make sure that's handled
+      if (historyData.status === 'failed') {
+        // These fields are optional for failed statuses
+        if (!historyData.targetPostId) {
+          historyData.targetPostId = 'failed_publish';
+        }
+      }
+      
+      const history = new PublishHistory(historyData);
+      return await history.save();
+    } catch (error) {
+      console.error('Error saving publish history:', error);
+      // Instead of throwing, return a minimal object for failure tracking
+      return {
+        _id: 'error',
+        status: 'failed',
+        errorMessage: `Failed to save history: ${error.message}`
+      };
+    }
   }
 
   /**

@@ -186,8 +186,8 @@ class PublishTaskService {
               postId: post._id,
               sourceGroupId: post.communityId,
               targetGroupId: targetGroup.groupId,
-              targetPostId: publishResult.postId,
-              targetPostUrl: publishResult.vkUrl,
+              targetPostId: publishResult.postId || 'unknown',
+              targetPostUrl: publishResult.vkUrl || '',
               publishedAt: new Date(),
               publishTaskId: task._id,
               status: 'success'
@@ -204,7 +204,8 @@ class PublishTaskService {
               publishedAt: new Date(),
               publishTaskId: task._id,
               status: 'failed',
-              errorMessage: publishResult.error
+              targetPostId: 'failed_publish', // Add this to prevent validation errors
+              errorMessage: publishResult.error || 'Unknown error'
             });
             
             result.failed++;
@@ -212,6 +213,24 @@ class PublishTaskService {
           
         } catch (error) {
           console.error(`Error publishing post ${post._id} to group ${targetGroup.groupId}:`, error);
+          
+          // Save error information (with error handling)
+          try {
+            await publishTaskRepository.savePublishHistory({
+              sourcePostId: post.postId || 'unknown',
+              postId: post._id,
+              sourceGroupId: post.communityId || 'unknown',
+              targetGroupId: targetGroup.groupId,
+              publishedAt: new Date(),
+              publishTaskId: task._id,
+              status: 'failed',
+              targetPostId: 'error', // Add this to prevent validation errors
+              errorMessage: error.message || 'Unknown error'
+            });
+          } catch (historyError) {
+            console.error('Failed to save error history:', historyError);
+          }
+          
           result.failed++;
         }
       }
