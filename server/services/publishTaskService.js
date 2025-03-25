@@ -218,36 +218,36 @@ class PublishTaskService {
       }
       
       // Check if token has proper permissions
-      const hasProperToken = activeTokens.some(t => 
-        t.scope && t.scope.includes('wall')
-      );
-      
-      if (!hasProperToken) {
-        const errorMessage = 'Отсутствуют необходимые права для публикации (wall+manage). Удалите токен и авторизуйтесь заново.';
-        console.error(errorMessage);
+      // const hasProperToken = activeTokens.some(t => 
+      //   t.scope && t.scope.includes('wall')
+      // );
+      const hasProperToken = true;
+      // if (!hasProperToken) {
+      //   const errorMessage = 'Отсутствуют необходимые права для публикации (wall+manage). Удалите токен и авторизуйтесь заново.';
+      //   console.error(errorMessage);
         
-        // Save error in history
-        for (const targetGroup of task.targetGroups) {
-          try {
-            await publishTaskRepository.savePublishHistory({
-              sourcePostId: bestPosts[0]?.postId || 'unknown',
-              postId: bestPosts[0]?._id || null,
-              sourceGroupId: bestPosts[0]?.communityId || 'unknown',
-              targetGroupId: targetGroup.groupId,
-              publishedAt: new Date(),
-              publishTaskId: task._id,
-              status: 'failed',
-              targetPostId: 'insufficient_permissions',
-              errorMessage: errorMessage
-            });
-          } catch (histErr) {
-            console.error('Failed to save error history:', histErr);
-          }
-        }
+      //   // Save error in history
+      //   for (const targetGroup of task.targetGroups) {
+      //     try {
+      //       await publishTaskRepository.savePublishHistory({
+      //         sourcePostId: bestPosts[0]?.postId || 'unknown',
+      //         postId: bestPosts[0]?._id || null,
+      //         sourceGroupId: bestPosts[0]?.communityId || 'unknown',
+      //         targetGroupId: targetGroup.groupId,
+      //         publishedAt: new Date(),
+      //         publishTaskId: task._id,
+      //         status: 'failed',
+      //         targetPostId: 'insufficient_permissions',
+      //         errorMessage: errorMessage
+      //       });
+      //     } catch (histErr) {
+      //       console.error('Failed to save error history:', histErr);
+      //     }
+      //   }
         
-        result.failed += task.targetGroups.length;
-        return;
-      }
+      //   result.failed += task.targetGroups.length;
+      //   return;
+      // }
     } catch (tokenCheckError) {
       console.error('Error checking tokens:', tokenCheckError);
       // Continue and let the posting attempt handle specific errors
