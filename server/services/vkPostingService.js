@@ -321,28 +321,46 @@ class VkPostingService {
    * @param {string} communityId - ID сообщества
    * @returns {Promise<string>} Строка с вложениями для VK API
    */
-  async prepareAttachments(attachments, token, communityId) {
+  async prepareAttachments(attachments, token, communityId, post = null) {
     if (!attachments || attachments.length === 0) {
       return '';
     }
     
     // Здесь будем собирать строки для attachments
     const attachmentStrings = [];
-    // console.log(`Attachments: ${attachments}`)
+    
+    console.log(`Preparing ${attachments.length} attachments for publication, post ID: ${post?._id || 'unknown'}`);
+    
+    // Проверяем наличие скачанных медиа
+    const hasDownloadedVideos = post && post.downloadedVideos && post.downloadedVideos.length > 0;
+    const hasMediaDownloads = post && post.mediaDownloads && post.mediaDownloads.length > 0;
+    
+    if (hasDownloadedVideos) {
+      console.log(`Post has ${post.downloadedVideos.length} downloaded videos`);
+    }
+    
+    if (hasMediaDownloads) {
+      console.log(`Post has ${post.mediaDownloads.length} media downloads`);
+    }
+    
     // Обрабатываем каждый тип вложений
     for (const attachment of attachments) {
-     
       try {
         if (attachment.type === 'photo') {
           // Определим лучший URL для фотографии в порядке приоритета:
           let bestPhotoUrl = null;
           
-          // 1. Проверяем, есть ли скачанное медиа в mediaDownloads
-          if (attachment.mediaDownloads && attachment.mediaDownloads.length > 0) {
-            const photoMedia = attachment.mediaDownloads.find(m => m.type === 'photo');
+          // 1. Проверяем наличие фото в mediaDownloads
+          if (hasMediaDownloads) {
+            // Ищем по ID конкретного фото
+            const photoId = attachment.photo?.id?.toString();
+            const photoMedia = post.mediaDownloads.find(m => 
+              m.type === 'photo' && m.mediaId === photoId
+            );
+            
             if (photoMedia && photoMedia.s3Url) {
               bestPhotoUrl = photoMedia.s3Url;
-              console.log(`Using high quality S3 photo: ${bestPhotoUrl}`);
+              console.log(`Using high quality S3 photo for ID ${photoId}: ${bestPhotoUrl}`);
             }
           }
           
@@ -353,7 +371,7 @@ class VkPostingService {
               if (a.width && a.height && b.width && b.height) {
                 return (b.width * b.height) - (a.width * a.height);
               }
-              return 0; 
+              return 0;
             });
             
             bestPhotoUrl = sortedSizes[0].url;
@@ -365,45 +383,29 @@ class VkPostingService {
             bestPhotoUrl = attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[0]?.url;
             console.log(`Using fallback photo URL: ${bestPhotoUrl}`);
           }
-          // Теперь загружаем фото лучшего качества
-          const photoAttachment = await this.queuePhotoUpload(bestPhotoUrl, token, communityId);
-          if (photoAttachment) {
-            attachmentStrings.push(photoAttachment);
+          
+          if (bestPhotoUrl) {
+            const photoAttachment = await this.queuePhotoUpload(bestPhotoUrl, token, communityId);
+            if (photoAttachment) {
+              attachmentStrings.push(photoAttachment);
+            }
           }
         }
         else if (attachment.type === 'video') {
-          console.log(attachment)
+          console.log(`Processing video attachment: ${attachment.video?.id || 'unknown'}`);
+          
           // Определяем лучший источник видео
           let videoAttachment = null;
           
-          // 1. Проверяем, есть ли скачанное видео в mediaDownloads
-          if (attachment.mediaDownloads && attachment.mediaDownloads.length > 0) {
-            const videoMedia = attachment.mediaDownloads.find(m => m.type === 'video');
-            if (videoMedia && videoMedia.s3Url) {
-              console.log(`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
-              // Загружаем видео в ВК через API
-              videoAttachment = await this.uploadVideoToVk(
-                videoMedia.s3Url, 
-                token, 
-                communityId,
-                attachment.video?.title || 'Video',
-                attachment.video?.description || ''
-              );
-              
-              if (videoAttachment) {
-                attachmentStrings.push(videoAttachment);
-                continue; // Переходим к следующему вложению
-              }
-            }
-          }
-          if (!videoAttachment && attachment.video?.id && attachment.downloadedVideos) {
-            const downloadedVideo = attachment.downloadedVideos.find(v => 
-              v.videoId === String(attachment.video.id)
-            );
+          // 1. Сначала проверяем наличие в downloadedVideos (обратная совместимость)
+          if (hasDownloadedVideos) {
+            const videoId = attachment.video?.id?.toString();
+            const downloadedVideo = post.downloadedVideos.find(v => v.videoId === videoId);
             
             if (downloadedVideo && downloadedVideo.s3Url) {
               console.log(`Found downloaded video in downloadedVideos: ${downloadedVideo.s3Url}`);
-              // Загружаем видео в ВК через API
+              
+              // Загружаем видео в ВКонтакте через API
               videoAttachment = await this.uploadVideoToVk(
                 downloadedVideo.s3Url,
                 token,
@@ -419,7 +421,33 @@ class VkPostingService {
             }
           }
           
-          // 3. Если видео скачанное не нашли, используем исходное из ВК
+          // 2. Затем проверяем mediaDownloads (новый формат)
+          if (!videoAttachment && hasMediaDownloads) {
+            const videoId = attachment.video?.id?.toString();
+            const videoMedia = post.mediaDownloads.find(m => 
+              m.type === 'video' && m.mediaId === videoId
+            );
+            
+            if (videoMedia && videoMedia.s3Url) {
+              console.log(`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
+              
+              // Загружаем видео в ВКонтакте через API
+              videoAttachment = await this.uploadVideoToVk(
+                videoMedia.s3Url,
+                token,
+                communityId,
+                attachment.video?.title || 'Video',
+                attachment.video?.description || ''
+              );
+              
+              if (videoAttachment) {
+                attachmentStrings.push(videoAttachment);
+                continue; // Переходим к следующему вложению
+              }
+            }
+          }
+          
+          // 3. Если скачанное видео не нашли, используем исходное из ВК
           if (attachment.video?.owner_id && attachment.video?.id) {
             console.log(`Using original VK video: ${attachment.video.owner_id}_${attachment.video.id}`);
             attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
@@ -429,6 +457,12 @@ class VkPostingService {
           // Для документов можно использовать существующие ID или загружать новые
           if (attachment.doc?.owner_id && attachment.doc?.id) {
             attachmentStrings.push(`doc${attachment.doc.owner_id}_${attachment.doc.id}`);
+          }
+        }
+        else if (attachment.type === 'audio') {
+          // Для аудио можно использовать существующие ID или загружать новые
+          if (attachment.audio?.owner_id && attachment.audio?.id) {
+            attachmentStrings.push(`audio${attachment.audio.owner_id}_${attachment.audio.id}`);
           }
         }
         // Добавьте обработку других типов вложений при необходимости
