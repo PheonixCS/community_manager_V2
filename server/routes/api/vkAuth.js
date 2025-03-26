@@ -50,19 +50,29 @@ router.delete('/tokens/:id', vkAuthController.deleteToken);
  */
 router.get('/status', async (req, res) => {
   try {
-    const tokens = await vkAuthController.getAllTokens(req, res);
-    const hasActiveToken = tokens.some(token => 
-      token.isActive && (token.expiresAt > Math.floor(Date.now() / 1000))
-    );
+    // Use a direct database query for more reliability
+    const VkUserToken = require('../../models/VkUserToken');
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Find active non-expired tokens
+    const activeTokens = await VkUserToken.find({
+      isActive: true,
+      expiresAt: { $gt: now }
+    });
     
     res.json({
-      authenticated: hasActiveToken,
-      activeTokensCount: tokens.filter(t => t.isActive && (t.expiresAt > Math.floor(Date.now() / 1000))).length,
-      totalTokensCount: tokens.length
+      authenticated: activeTokens.length > 0,
+      activeTokensCount: activeTokens.length,
+      totalTokensCount: await VkUserToken.countDocuments()
     });
   } catch (error) {
     console.error('Error checking auth status:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      authenticated: false,
+      activeTokensCount: 0,
+      totalTokensCount: 0
+    });
   }
 });
 
@@ -73,11 +83,41 @@ router.get('/status', async (req, res) => {
 router.get('/groups', async (req, res) => {
   try {
     const vkAuthService = require('../../services/vkAuthService');
+    const Settings = require('../../models/Settings');
+    
+    // First try to get from settings for faster response
+    let settings;
+    try {
+      settings = await Settings.findOne({});
+      
+      // If we have stored groups in settings, return them immediately
+      if (settings?.vkGroups && Array.isArray(settings.vkGroups) && settings.vkGroups.length > 0) {
+        console.log('Returning groups from settings cache:', settings.vkGroups.length);
+        
+        // Return both the formatted array and as a VK API-like response
+        return res.json({
+          response: {
+            count: settings.vkGroups.length,
+            items: settings.vkGroups.map(group => ({
+              id: parseInt(group.id.replace('-', '')),
+              name: group.name
+            }))
+          },
+          cached: true
+        });
+      }
+    } catch (settingsError) {
+      console.error('Error getting groups from settings:', settingsError);
+      // Continue with API request
+    }
+    
+    // Try to get from VK API
     const token = await vkAuthService.getActiveToken(['groups']);
     
     if (!token) {
       return res.status(401).json({ 
-        error: 'Не найден активный токен ВКонтакте с правами на доступ к группам' 
+        error: 'Не найден активный токен ВКонтакте с правами на доступ к группам',
+        response: { count: 0, items: [] }
       });
     }
     
@@ -89,7 +129,8 @@ router.get('/groups', async (req, res) => {
         filter: 'admin',
         extended: 1,
         v: '5.131'
-      }
+      },
+      timeout: 5000 // Add timeout to prevent hanging requests
     });
     
     if (response.data.error) {
@@ -100,8 +141,9 @@ router.get('/groups', async (req, res) => {
     
     // Save groups to settings for future use
     try {
-      const Settings = require('../../models/Settings');
-      let settings = await Settings.findOne({}) || new Settings({});
+      if (!settings) {
+        settings = await Settings.findOne({}) || new Settings({});
+      }
       
       // Format groups for storage
       const formattedGroups = groups.map(group => ({
@@ -116,10 +158,38 @@ router.get('/groups', async (req, res) => {
       // Continue even if settings save fails
     }
     
-    res.json(response.data.response); // Return the full response object
+    res.json(response.data);
   } catch (error) {
     console.error('Error fetching VK groups:', error);
-    res.status(500).json({ error: error.message });
+    
+    // Try to return groups from settings as fallback
+    try {
+      const Settings = require('../../models/Settings');
+      const settings = await Settings.findOne({});
+      
+      if (settings?.vkGroups && Array.isArray(settings.vkGroups) && settings.vkGroups.length > 0) {
+        console.log('Returning groups from settings as fallback:', settings.vkGroups.length);
+        
+        return res.json({
+          response: {
+            count: settings.vkGroups.length,
+            items: settings.vkGroups.map(group => ({
+              id: parseInt(group.id.replace('-', '')),
+              name: group.name
+            }))
+          },
+          fallback: true
+        });
+      }
+    } catch (fallbackError) {
+      console.error('Error getting groups from settings fallback:', fallbackError);
+    }
+    
+    // If all else fails, return an empty response instead of an error
+    res.json({
+      response: { count: 0, items: [] },
+      error: error.message
+    });
   }
 });
 

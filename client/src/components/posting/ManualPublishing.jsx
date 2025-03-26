@@ -143,7 +143,27 @@ const ManualPublishing = () => {
       });
     } catch (error) {
       console.error('Error checking auth status:', error);
-      setAuthStatus({ hasActiveToken: false });
+      // Add more detailed error logging
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+      }
+      
+      // Use the status endpoint as a fallback
+      try {
+        const statusResponse = await axios.get('/api/vk-auth/status');
+        setAuthStatus({
+          hasActiveToken: statusResponse.data.authenticated
+        });
+      } catch (fallbackError) {
+        console.error('Fallback auth check also failed:', fallbackError);
+        setAuthStatus({ 
+          hasActiveToken: false,
+          error: 'Failed to check authentication status. Server may be unavailable.'
+        });
+      }
     }
   };
   

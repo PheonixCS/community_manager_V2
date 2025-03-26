@@ -1,5 +1,6 @@
 const vkAuthService = require('../services/vkAuthService');
 const config = require('../config/config');
+const VkUserToken = require('../models/VkUserToken');
 
 /**
  * VK Authentication Controller
@@ -189,31 +190,20 @@ class VkAuthController {
    */
   async getAllTokens(req, res) {
     try {
-      const tokens = await vkAuthService.getAllTokens();
+      const tokens = await VkUserToken.find().sort({ createdAt: -1 });
       
-      // Don't return actual tokens in API response for security
-      const safeTokens = tokens.map(token => ({
-        id: token._id,
-        vkUserId: token.vkUserId,
-        vkUserName: token.vkUserName,
-        isActive: token.isActive,
-        expiresAt: token.expiresAt,
-        lastUsed: token.lastUsed,
-        lastRefreshed: token.lastRefreshed,
-        scope: token.scope,
-        createdAt: token.createdAt,
-        updatedAt: token.updatedAt,
-        userInfo: {
-          firstName: token.userInfo?.first_name,
-          lastName: token.userInfo?.last_name,
-          photo: token.userInfo?.photo_200,
-          screenName: token.userInfo?.screen_name
-        }
-      }));
+      // If this function is called directly without res (for internal use)
+      if (!res) return tokens;
       
-      res.json(safeTokens);
+      // Send response
+      res.json(tokens);
     } catch (error) {
-      console.error('Error fetching tokens:', error);
+      console.error('Error getting tokens:', error);
+      
+      // If this function is called directly without res (for internal use)
+      if (!res) throw error;
+      
+      // Send error response
       res.status(500).json({ error: error.message });
     }
   }
