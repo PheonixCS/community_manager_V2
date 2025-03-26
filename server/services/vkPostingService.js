@@ -479,6 +479,7 @@ class VkPostingService {
       }
       
       const savedPhoto = saveResponse.data.response[0];
+      console.log(`Saved Photos:`, savedPhoto);
       console.log(`Successfully saved photo with ID: ${savedPhoto.id}`);
       
       return `photo${savedPhoto.owner_id}_${savedPhoto.id}`;
