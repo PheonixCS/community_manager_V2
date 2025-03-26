@@ -6,6 +6,9 @@ const vkAuthService = require('./vkAuthService');
 const { postRepository } = require('../repositories');
 const config = require('../config/config');
 
+// Add the missing VK API version constant
+const vkApiVersion = config.vk.apiVersion || '5.131';
+
 /**
  * Сервис для публикации постов в сообщества ВКонтакте
  */
@@ -15,6 +18,12 @@ class VkPostingService {
     this.photoUploadQueue = [];
     this.isProcessingQueue = false;
     this.uploadDelay = 1000; // 1 second delay between photo uploads
+    
+    // Cache the config values for better performance
+    this.s3PublicEndpoint = config.s3.publicEndpoint || 'http://krazu-group.tech:9000';
+    
+    console.log(`VK Posting Service initialized with API version ${vkApiVersion}`);
+    console.log(`Using S3 public endpoint: ${this.s3PublicEndpoint}`);
   }
 
   /**
@@ -695,12 +704,11 @@ class VkPostingService {
   convertLocalUrlToPublic(url) {
     if (!url) return url;
     
-    // Импортируем конфиг
-    const config = require('../config/config');
-    const publicEndpoint = config.s3.publicEndpoint;
+    // Use the cached public endpoint from constructor
+    const publicEndpoint = this.s3PublicEndpoint;
     
     // Если URL уже использует публичный эндпоинт, возвращаем как есть
-    if (url.includes('krazu-group.tech') || url.includes('your-domain.com')) {
+    if (url.includes('krazu-group.tech') || url.includes(publicEndpoint)) {
       return url;
     }
     
@@ -715,6 +723,9 @@ class VkPostingService {
       const bucketPath = url.startsWith('/') ? url : `/${url}`;
       return `${publicEndpoint}${bucketPath}`;
     }
+    
+    // Log problematic URLs for debugging
+    console.log(`Could not convert URL to public format: ${url}`);
     
     // Если не удалось распознать URL, возвращаем исходный
     return url;
@@ -1219,12 +1230,15 @@ class VkPostingService {
    */
   async uploadPhotoToVk(photoUrl, ownerId, token) {
     try {
+      // Add debug log
+      console.log(`Starting photo upload to VK. URL: ${photoUrl}, Community ID: ${ownerId}`);
+      
       // Step 1: Get server for photo upload
       const serverResponse = await axios.get('https://api.vk.com/method/photos.getWallUploadServer', {
         params: {
           group_id: Math.abs(parseInt(ownerId)).toString(), // VK requires positive ID without the minus
           access_token: token,
-          v: vkApiVersion
+          v: vkApiVersion // Use the defined constant
         }
       });
       
@@ -1233,25 +1247,39 @@ class VkPostingService {
       }
       
       const uploadUrl = serverResponse.data.response.upload_url;
+      console.log(`Got upload server URL: ${uploadUrl}`);
       
       // Step 2: Download the image from URL and upload to VK server
+      console.log(`Downloading image from: ${photoUrl}`);
       const photoResponse = await axios.get(photoUrl, {
         responseType: 'arraybuffer'
       });
       
+      console.log(`Successfully downloaded image, size: ${photoResponse.data.byteLength} bytes`);
+      
+      const FormData = require('form-data');
       const formData = new FormData();
       formData.append('photo', Buffer.from(photoResponse.data), {
         filename: `photo_${Date.now()}.png`,
         contentType: 'image/png'
       });
       
+      console.log('Uploading photo to VK server...');
       const uploadResponse = await axios.post(uploadUrl, formData, {
         headers: {
           ...formData.getHeaders()
         }
       });
       
+      console.log('Upload response received:', uploadResponse.data);
+      
+      if (!uploadResponse.data || uploadResponse.data.error || !uploadResponse.data.photo || uploadResponse.data.photo === 'null') {
+        console.error('Invalid upload response:', uploadResponse.data);
+        throw new Error('Failed to upload photo to VK server: invalid response');
+      }
+      
       // Step 3: Save the uploaded photo to wall
+      console.log('Saving photo to wall...');
       const saveResponse = await axios.get('https://api.vk.com/method/photos.saveWallPhoto', {
         params: {
           group_id: Math.abs(parseInt(ownerId)).toString(),
@@ -1259,7 +1287,7 @@ class VkPostingService {
           server: uploadResponse.data.server,
           hash: uploadResponse.data.hash,
           access_token: token,
-          v: vkApiVersion
+          v: vkApiVersion // Use the defined constant
         }
       });
       
@@ -1271,6 +1299,7 @@ class VkPostingService {
       const photo = saveResponse.data.response[0];
       const attachment = `photo${photo.owner_id}_${photo.id}`;
       
+      console.log(`Successfully saved photo with ID: ${attachment}`);
       return { attachment, photoData: photo };
     } catch (error) {
       console.error('Error uploading photo to VK:', error.message);
