@@ -328,7 +328,7 @@ class VkPostingService {
     
     // Здесь будем собирать строки для attachments
     const attachmentStrings = [];
-    console.log(`Attachments: ${attachments}`)
+    // console.log(`Attachments: ${attachments}`)
     // Обрабатываем каждый тип вложений
     for (const attachment of attachments) {
      
@@ -372,6 +372,7 @@ class VkPostingService {
           }
         }
         else if (attachment.type === 'video') {
+          console.log(attachment)
           // Определяем лучший источник видео
           let videoAttachment = null;
           
