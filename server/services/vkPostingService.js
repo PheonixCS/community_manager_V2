@@ -328,14 +328,16 @@ class VkPostingService {
     
     // Здесь будем собирать строки для attachments
     const attachmentStrings = [];
-    
+    console.log(`Attachments: ${attachments}`)
     // Обрабатываем каждый тип вложений
     for (const attachment of attachments) {
+     
       try {
         if (attachment.type === 'photo') {
           // Загружаем фото на сервер ВК
+          
           const photoAttachment = await this.queuePhotoUpload(
-            attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[-1]?.url,
+            attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[0]?.url,
             token,
             communityId
           );
@@ -479,7 +481,7 @@ class VkPostingService {
       }
       
       const savedPhoto = saveResponse.data.response[0];
-      console.log(`Saved Photos:`, savedPhoto);
+      console.log(`Saved Photos`)
       console.log(`Successfully saved photo with ID: ${savedPhoto.id}`);
       
       return `photo${savedPhoto.owner_id}_${savedPhoto.id}`;
