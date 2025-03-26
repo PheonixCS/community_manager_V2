@@ -334,17 +334,43 @@ class VkPostingService {
      
       try {
         if (attachment.type === 'photo') {
-          // Загружаем фото на сервер ВК
+          // Определим лучший URL для фотографии в порядке приоритета:
+          let bestPhotoUrl = null;
           
-          const photoAttachment = await this.queuePhotoUpload(
-            attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[0]?.url,
-            token,
-            communityId
-          );
+          // 1. Проверяем, есть ли скачанное медиа в mediaDownloads
+          if (attachment.mediaDownloads && attachment.mediaDownloads.length > 0) {
+            const photoMedia = attachment.mediaDownloads.find(m => m.type === 'photo');
+            if (photoMedia && photoMedia.s3Url) {
+              bestPhotoUrl = photoMedia.s3Url;
+              console.log(`Using high quality S3 photo: ${bestPhotoUrl}`);
+            }
+          }
+          
+          // 2. Если нет в mediaDownloads, ищем наилучшее качество из sizes
+          if (!bestPhotoUrl && attachment.photo?.sizes && attachment.photo.sizes.length > 0) {
+            // Сортируем sizes по убыванию размера (большие сначала)
+            const sortedSizes = [...attachment.photo.sizes].sort((a, b) => {
+              if (a.width && a.height && b.width && b.height) {
+                return (b.width * b.height) - (a.width * a.height);
+              }
+              return 0; 
+            });
+            
+            bestPhotoUrl = sortedSizes[0].url;
+            console.log(`Using best quality VK photo: ${sortedSizes[0].width}x${sortedSizes[0].height}`);
+          }
+          
+          // 3. Если не нашли лучшее фото, используем старую логику
+          if (!bestPhotoUrl) {
+            bestPhotoUrl = attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[0]?.url;
+            console.log(`Using fallback photo URL: ${bestPhotoUrl}`);
+          }
+          // Теперь загружаем фото лучшего качества
+          const photoAttachment = await this.queuePhotoUpload(bestPhotoUrl, token, communityId);
           if (photoAttachment) {
             attachmentStrings.push(photoAttachment);
           }
-        } 
+        }
         else if (attachment.type === 'video') {
           // Для видео можно использовать существующие ID или загружать новые
           if (attachment.video?.owner_id && attachment.video?.id) {
