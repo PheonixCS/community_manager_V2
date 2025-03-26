@@ -127,6 +127,8 @@ class VkPostingService {
       let postId;
       let postText;
       let attachments;
+      let isCarousel = false;
+      let userAddedMedia = false;
       
       // Проверяем, передан ли пост как объект или как ID
       if (typeof postIdOrData === 'object') {
@@ -136,7 +138,20 @@ class VkPostingService {
         postText = post.text || '';
         attachments = post.attachments;
         
-        console.log(`Publishing modified post to community ${communityId}`);
+        // Проверяем, добавлены ли медиа пользователем
+        if (originalPostId) {
+          const originalPost = await Post.findById(originalPostId);
+          if (originalPost && post.attachments) {
+            // Если количество вложений увеличилось, значит пользователь добавил медиа
+            userAddedMedia = post.attachments.length > originalPost.attachments.length;
+            if (userAddedMedia) {
+              console.log('User added media to post, will use carousel mode');
+            }
+          }
+        }
+        
+        isCarousel = post.isCarousel || userAddedMedia;
+        console.log(`Publishing modified post (isCarousel: ${isCarousel}) to community ${communityId}`);
       } else {
         // Передан ID поста - загрузить из базы
         postId = postIdOrData;
@@ -150,9 +165,11 @@ class VkPostingService {
         
         postText = post.text || '';
         attachments = post.attachments;
+        isCarousel = post.isCarousel;
 
-        console.log(`isCarousel: ${post.isCarousel}`)
-        console.log(`post: ${post}`)
+        console.log(`isCarousel: ${isCarousel}`);
+        console.log(`post: ${post._id}`);
+        
         // Apply transformations from the options (для обратной совместимости)
         if (options.removeHashtags) {
           postText = postText.replace(/#[\wа-яА-ЯёЁ]+/g, '').replace(/\s+/g, ' ').trim();
@@ -188,6 +205,11 @@ class VkPostingService {
         message: postText,
         // Добавляем attachments, если есть
         attachments: await this.prepareAttachments(attachments, token, communityId, post),
+        // Добавляем внутренние метаданные для использования в makeWallPostRequest
+        _post: post,
+        _isCarousel: isCarousel,
+        _photosCount: attachments ? attachments.filter(a => a.type === 'photo').length : 0,
+        _mediaAdded: userAddedMedia,
         // Применяем опции публикации
         ...this.preparePublishOptions(options)
       };
@@ -334,6 +356,16 @@ class VkPostingService {
     // Проверяем наличие скачанных медиа
     const hasDownloadedVideos = post && post.downloadedVideos && post.downloadedVideos.length > 0;
     const hasMediaDownloads = post && post.mediaDownloads && post.mediaDownloads.length > 0;
+    
+    // Определяем, нужен ли режим карусели для поста
+    const isCarousel = post && post.isCarousel;
+    if (isCarousel) {
+      console.log(`Post is marked as carousel. Will use carousel mode for publishing.`);
+    }
+    
+    // Подсчитываем количество изображений для определения необходимости карусели
+    const photoAttachments = attachments.filter(a => a.type === 'photo').length;
+    console.log(`Post has ${photoAttachments} photo attachments`);
     
     if (hasDownloadedVideos) {
       console.log(`Post has ${post.downloadedVideos.length} downloaded videos`);
@@ -572,6 +604,12 @@ class VkPostingService {
       
       console.log('Successfully uploaded photo to VK server');
       
+      // Проверяем наличие необходимых полей в ответе
+      if (!uploadResponse.data.photo || uploadResponse.data.photo === 'null' || uploadResponse.data.photo === '') {
+        console.error('Invalid photo in upload response:', uploadResponse.data);
+        throw new Error('VK Upload Error: Invalid photo data in response');
+      }
+      
       // 5. Сохраняем фото на стену
       const saveResponse = await axios.get('https://api.vk.com/method/photos.saveWallPhoto', {
         params: {
@@ -586,6 +624,11 @@ class VkPostingService {
       
       if (saveResponse.data.error) {
         throw new Error(`VK API Error: ${saveResponse.data.error.error_msg}`);
+      }
+      
+      if (!saveResponse.data.response || !saveResponse.data.response[0]) {
+        console.error('Empty response from photos.saveWallPhoto:', saveResponse.data);
+        throw new Error('Empty response when saving photo');
       }
       
       const savedPhoto = saveResponse.data.response[0];
@@ -649,44 +692,102 @@ class VkPostingService {
         throw new Error('Failed to get upload URL from VK API');
       }
       
+      // Сначала проверяем размер видео перед загрузкой
+      try {
+        const headResponse = await axios.head(publicVideoUrl);
+        const videoSize = parseInt(headResponse.headers['content-length'] || '0', 10);
+        console.log(`Video size: ${(videoSize / (1024 * 1024)).toFixed(2)} MB`);
+        
+        // Если видео больше 50MB, используем fallback привязку вместо загрузки
+        if (videoSize > 50 * 1024 * 1024) {
+          console.log(`Video is too large (${(videoSize / (1024 * 1024)).toFixed(2)} MB), falling back to original VK video`);
+          // Извлекаем ID из оригинального URL или метаданных
+          if (videoUrl.includes('/video_')) {
+            const matches = videoUrl.match(/video_.*?_(\d+)/);
+            if (matches && matches[1]) {
+              const originalVideoId = matches[1];
+              const ownerId = communityId; // Используем ID сообщества как владельца
+              console.log(`Using original VK video reference: ${ownerId}_${originalVideoId}`);
+              return `video${ownerId}_${originalVideoId}`;
+            }
+          }
+          return null; // Если не удалось извлечь ID, вернем null
+        }
+      } catch (sizeError) {
+        console.error('Error checking video size:', sizeError);
+        // Продолжаем загрузку, если не удалось проверить размер
+      }
+      
       // 2. Загружаем видео на сервер ВК
-      // Сначала скачиваем видео с S3, затем загружаем в ВКонтакте
-      const videoResponse = await axios.get(publicVideoUrl, {
-        responseType: 'arraybuffer'
-      });
-      
-      const FormData = require('form-data');
-      const formData = new FormData();
-      formData.append('video_file', Buffer.from(videoResponse.data), {
-        filename: 'video.mp4',
-        contentType: 'video/mp4'
-      });
-      
-      const uploadResponse = await axios.post(uploadInfo.upload_url, formData, {
-        headers: {
-          ...formData.getHeaders()
-        },
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-      });
-      
-      console.log('Video upload response:', uploadResponse.data);
-      
-      // 3. Проверяем результаты загрузки
-      if (uploadResponse.data.error) {
-        throw new Error(`Error uploading video: ${uploadResponse.data.error}`);
+      try {
+        // Сначала скачиваем видео с S3, затем загружаем в ВКонтакте
+        const videoResponse = await axios.get(publicVideoUrl, {
+          responseType: 'arraybuffer',
+          timeout: 120000 // Увеличиваем таймаут до 2 минут для скачивания видео
+        });
+        
+        const FormData = require('form-data');
+        const formData = new FormData();
+        formData.append('video_file', Buffer.from(videoResponse.data), {
+          filename: 'video.mp4',
+          contentType: 'video/mp4'
+        });
+        
+        const uploadResponse = await axios.post(uploadInfo.upload_url, formData, {
+          headers: {
+            ...formData.getHeaders()
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          timeout: 300000 // 5 минут на загрузку
+        });
+        
+        console.log('Video upload response:', uploadResponse.data);
+        
+        // 3. Проверяем результаты загрузки
+        if (uploadResponse.data.error) {
+          throw new Error(`Error uploading video: ${uploadResponse.data.error}`);
+        }
+        
+        // 4. Формируем идентификатор видео для вложений
+        const videoId = uploadInfo.video_id;
+        const ownerId = uploadInfo.owner_id;
+        
+        if (!videoId || !ownerId) {
+          throw new Error('Failed to get video ID from VK API');
+        }
+        
+        console.log(`Successfully uploaded video with ID: video${ownerId}_${videoId}`);
+        return `video${ownerId}_${videoId}`;
+      } catch (uploadError) {
+        // Если ошибка 406 (Not Acceptable), вероятно видео слишком большое или неподходящий формат
+        if (uploadError.response && uploadError.response.status === 406) {
+          console.log(`Video upload failed with 406 error (likely too large or wrong format)`);
+          console.log('Error response:', uploadError.response.data);
+          console.log('Headers:', uploadError.response.headers);
+          
+          // Если есть X-Reason заголовок, выводим его
+          if (uploadError.response.headers['x-reason']) {
+            console.log('Reason:', uploadError.response.headers['x-reason']);
+          }
+          
+          // Пробуем использовать оригинальное видео из VK
+          if (videoUrl.includes('/video_')) {
+            const matches = videoUrl.match(/video_.*?_(\d+)/);
+            if (matches && matches[1]) {
+              const originalVideoId = matches[1];
+              // Извлекаем ID сообщества или пользователя из URL
+              const ownerMatches = videoUrl.match(/video_(-?\d+)_/);
+              const ownerId = ownerMatches ? ownerMatches[1] : communityId;
+              console.log(`Falling back to original VK video: ${ownerId}_${originalVideoId}`);
+              return `video${ownerId}_${originalVideoId}`;
+            }
+          }
+        }
+        
+        console.error('Error uploading video:', uploadError);
+        return null;
       }
-      
-      // 4. Формируем идентификатор видео для вложений
-      const videoId = uploadInfo.video_id;
-      const ownerId = uploadInfo.owner_id;
-      
-      if (!videoId || !ownerId) {
-        throw new Error('Failed to get video ID from VK API');
-      }
-      
-      console.log(`Successfully uploaded video with ID: video${ownerId}_${videoId}`);
-      return `video${ownerId}_${videoId}`;
       
     } catch (error) {
       console.error('Error uploading video to VK:', error);
@@ -796,11 +897,26 @@ class VkPostingService {
       // Add access token and API version to form data
       formData.append('access_token', token);
       formData.append('v', '5.131');
-      formData.append('primary_attachments_mode', 'carousel');
       formData.append('from_group', '1');
+      
+      // Определяем, нужно ли использовать режим карусели
+      // Используем carousel_mode, если:
+      // 1. У поста установлен флаг isCarousel
+      // 2. В посте более одного фото
+      const useCarouselMode = 
+        (postData._post && postData._post.isCarousel) || 
+        (postData._photosCount && postData._photosCount > 1) ||
+        (postData._mediaAdded);
+        
+      if (useCarouselMode) {
+        console.log('Using carousel mode for post publishing');
+        formData.append('primary_attachments_mode', 'carousel');
+      }
+      
       // Add all post data parameters to form data
       for (const [key, value] of Object.entries(postData)) {
-        if (value !== undefined && value !== null) {
+        // Skip our internal properties that start with _
+        if (!key.startsWith('_') && value !== undefined && value !== null) {
           formData.append(key, value);
         }
       }
