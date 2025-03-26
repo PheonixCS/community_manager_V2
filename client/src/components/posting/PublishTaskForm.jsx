@@ -636,14 +636,17 @@ const PublishTaskForm = () => {
     
     switch (param.type) {
       case 'string':
+      case 'text':
         return (
           <TextField
             fullWidth
-            label={param.name}
+            label={param.label || param.name}
             value={currentValue || ''}
             onChange={(e) => handleParamChange(param.name, e.target.value)}
             helperText={param.description}
             margin="normal"
+            multiline={param.type === 'text'}
+            rows={param.type === 'text' ? 3 : 1}
           />
         );
       case 'number':
@@ -651,11 +654,18 @@ const PublishTaskForm = () => {
           <TextField
             fullWidth
             type="number"
-            label={param.name}
-            value={currentValue !== undefined ? currentValue : 0}
+            label={param.label || param.name}
+            value={currentValue !== undefined ? currentValue : (param.default || 0)}
             onChange={(e) => handleParamChange(param.name, Number(e.target.value))}
             helperText={param.description}
             margin="normal"
+            InputProps={{
+              inputProps: { 
+                min: param.min || 0,
+                max: param.max || undefined,
+                step: param.step || 1
+              }
+            }}
           />
         );
       case 'boolean':
@@ -663,19 +673,84 @@ const PublishTaskForm = () => {
           <FormControlLabel
             control={
               <Switch
-                checked={currentValue || false}
+                checked={currentValue !== undefined ? currentValue : (param.default || false)}
                 onChange={(e) => handleParamChange(param.name, e.target.checked)}
               />
             }
-            label={param.description || param.name}
+            label={param.label || param.description || param.name}
             sx={{ my: 2 }}
           />
+        );
+      case 'select':
+        return (
+          <FormControl fullWidth margin="normal">
+            <InputLabel id={`select-label-${param.name}`}>{param.label || param.name}</InputLabel>
+            <Select
+              labelId={`select-label-${param.name}`}
+              value={currentValue !== undefined ? currentValue : (param.default || '')}
+              onChange={(e) => handleParamChange(param.name, e.target.value)}
+              label={param.label || param.name}
+            >
+              {param.options?.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label || option.value}
+                </MenuItem>
+              ))}
+            </Select>
+            {param.description && (
+              <FormHelperText>{param.description}</FormHelperText>
+            )}
+          </FormControl>
+        );
+      case 'multiselect':
+        const selectedValues = Array.isArray(currentValue) 
+          ? currentValue 
+          : (currentValue ? [currentValue] : (param.default || []));
+        
+        // Check for dependent field - should this be shown?
+        const dependentField = param.dependent;
+        if (dependentField && task.contentGeneratorSettings.params) {
+          const parentValue = task.contentGeneratorSettings.params[dependentField.param];
+          if (!dependentField.values.includes(parentValue)) {
+            return null; // Don't show this field if parent value doesn't match
+          }
+        }
+        
+        return (
+          <FormControl fullWidth margin="normal">
+            <InputLabel id={`multiselect-label-${param.name}`}>{param.label || param.name}</InputLabel>
+            <Select
+              labelId={`multiselect-label-${param.name}`}
+              multiple
+              value={selectedValues}
+              onChange={(e) => handleParamChange(param.name, e.target.value)}
+              label={param.label || param.name}
+              renderValue={(selected) => {
+                // Map selected values to their labels
+                const selectedLabels = selected.map(value => {
+                  const option = param.options?.find(opt => opt.value === value);
+                  return option ? option.label : value;
+                });
+                return selectedLabels.join(', ');
+              }}
+            >
+              {param.options?.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  <Checkbox checked={selectedValues.indexOf(option.value) > -1} />
+                  <ListItemText primary={option.label || option.value} />
+                </MenuItem>
+              ))}
+            </Select>
+            {param.description && (
+              <FormHelperText>{param.description}</FormHelperText>
+            )}
+          </FormControl>
         );
       default:
         return (
           <TextField
             fullWidth
-            label={param.name}
+            label={param.label || param.name}
             value={currentValue || ''}
             onChange={(e) => handleParamChange(param.name, e.target.value)}
             helperText={param.description}
@@ -1188,19 +1263,142 @@ const PublishTaskForm = () => {
                 ))}
               </Select>
             </FormControl>
+
             {selectedGenerator && (
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Параметры генератора
+              <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    {selectedGenerator.name}
                   </Typography>
-                  {selectedGenerator.params.map((param) => (
-                    <Box key={param.name}>
-                      {getParamInput(param)}
+                  {selectedGenerator.description && (
+                    <Typography variant="body2" color="text.secondary" paragraph>
+                      {selectedGenerator.description}
+                    </Typography>
+                  )}
+                  <Divider sx={{ my: 2 }} />
+
+                  {/* Специальные элементы интерфейса для генератора гороскопов */}
+                  {selectedGenerator.id === 'horoscope' && (
+                    <Box sx={{ mb: 3 }}>
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        <AlertTitle>Генератор гороскопов</AlertTitle>
+                        Этот генератор создаёт гороскопы на завтра для выбранных знаков зодиака, получая данные с сайта horo.mail.ru
+                      </Alert>
+                      
+                      <Card variant="outlined" sx={{ mb: 2 }}>
+                        <CardHeader 
+                          avatar={<CalendarIcon color="primary" />}
+                          title="Настройка контента"
+                          subheader="Выберите знаки зодиака и формат публикации"
+                        />
+                        <Divider />
+                        <CardContent>
+                          {/* Параметры для генератора гороскопов будут отображаться здесь */}
+                          <Grid container spacing={2}>
+                            {selectedGenerator.params
+                              .filter(param => !param.dependent || 
+                                (param.dependent && 
+                                 task.contentGeneratorSettings.params && 
+                                 param.dependent.values.includes(task.contentGeneratorSettings.params[param.dependent.param])))
+                              .map((param) => (
+                                <Grid item xs={12} sm={param.type === 'boolean' ? 6 : 12} key={param.name}>
+                                  {getParamInput(param)}
+                                </Grid>
+                            ))}
+                          </Grid>
+
+                          {task.contentGeneratorSettings?.params?.imageType === 'image' && (
+                            <Alert severity="info" sx={{ mt: 2 }}>
+                              <AlertTitle>Для работы с изображениями</AlertTitle>
+                              <Typography variant="body2">
+                                Добавьте шрифты и картинки в папку server/resources:
+                              </Typography>
+                              <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+                                <li>fonts/bebas_neue_ru.ttf - для заголовков</li>
+                                <li>fonts/museo_cyrl.otf - для текста</li>
+                                <li>fonts/Roboto.ttf - для нумерации</li>
+                                <li>main.png - фоновое изображение</li>
+                              </ul>
+                            </Alert>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      <Card variant="outlined">
+                        <CardHeader 
+                          avatar={<TextFieldsIcon color="primary" />}
+                          title="Пример вывода"
+                          subheader="Так будет выглядеть публикация"
+                        />
+                        <Divider />
+                        <CardContent>
+                          <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mb: 2 }}>
+                            {task.contentGeneratorSettings?.params?.addHeader && 
+                              task.contentGeneratorSettings?.params?.header && 
+                              `${task.contentGeneratorSettings.params.header}\n\n`}
+                              
+                            {task.contentGeneratorSettings?.params?.signSelection === 'single' &&
+                              task.contentGeneratorSettings?.params?.signs &&
+                              task.contentGeneratorSettings?.params?.signs.length > 0 &&
+                              `🔮 ${
+                                param => param.options.find(
+                                  opt => opt.value === task.contentGeneratorSettings.params.signs[0]
+                                )?.label || 'Знак зодиака'
+                              } (${new Date().toLocaleDateString()})\nТекст гороскопа для выбранного знака зодиака...\n\n`
+                            }
+                            
+                            {task.contentGeneratorSettings?.params?.signSelection === 'all' &&
+                              `🔮 Овен (${new Date().toLocaleDateString()})\nТекст гороскопа для Овна...\n\n
+                              🔮 Телец (${new Date().toLocaleDateString()})\nТекст гороскопа для Тельца...\n\n
+                              [... остальные знаки зодиака ...]`
+                            }
+                            
+                            {task.contentGeneratorSettings?.params?.addFooter && 
+                              task.contentGeneratorSettings?.params?.footer && 
+                              `\n\n${task.contentGeneratorSettings.params.footer}`}
+                          </Typography>
+
+                          {task.contentGeneratorSettings?.params?.imageType === 'image' && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                              <Card sx={{ maxWidth: 300 }}>
+                                <CardMedia
+                                  component="img"
+                                  height="300"
+                                  image="/horoscope-example.png"
+                                  alt="Пример изображения гороскопа"
+                                  onError={(e) => {
+                                    e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="%231e3b70"/><text x="150" y="150" font-family="Arial" font-size="20" fill="white" text-anchor="middle">Пример изображения гороскопа</text></svg>';
+                                  }}
+                                />
+                                <CardContent>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Изображение гороскопа будет сгенерировано для каждого знака зодиака
+                                    {task.contentGeneratorSettings?.params?.carouselMode ? ' и опубликовано в виде карусели' : ''}
+                                  </Typography>
+                                </CardContent>
+                              </Card>
+                            </Box>
+                          )}
+                        </CardContent>
+                      </Card>
                     </Box>
-                  ))}
-                </CardContent>
-              </Card>
+                  )}
+
+                  {/* Стандартное отображение параметров для других генераторов */}
+                  {selectedGenerator.id !== 'horoscope' && (
+                    <Box>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Параметры генератора
+                      </Typography>
+                      {selectedGenerator.params.map((param) => (
+                        <Box key={param.name}>
+                          {getParamInput(param)}
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              </Paper>
             )}
           </Box>
         ) : (
