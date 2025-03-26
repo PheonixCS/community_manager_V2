@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
 const pythonBridge = require('./pythonBridge');
+const s3Service = require('../s3Service');
+const { v4: uuidv4 } = require('uuid');
 
 // Zodiac signs in both English and Russian
 const ZODIAC_SIGNS = {
@@ -200,27 +202,39 @@ class HoroscopeGenerator {
   // Generate images for horoscopes if needed
   async generateHoroscopeImages(horoscopeData) {
     try {
-      // Create temp directory for images if it doesn't exist
-      const tempDir = path.join(os.tmpdir(), 'horoscope-images');
-      try {
-        await fs.mkdir(tempDir, { recursive: true });
-      } catch (err) {
-        if (err.code !== 'EEXIST') throw err;
-      }
+      // Create S3 folder path for this batch (with unique identifier)
+      const s3FolderPath = `horoscope-images/${Date.now()}-${uuidv4().substring(0, 8)}`;
+      console.log(`Using S3 folder path: ${s3FolderPath}`);
 
-      // For each horoscope, generate an image using our JavaScript implementation
+      // For each horoscope, generate an image and upload to S3
       for (const sign in horoscopeData) {
         const horoscope = horoscopeData[sign];
-        const imagePath = path.join(tempDir, `${sign.toLowerCase()}_horoscope.png`);
+        const fileName = `${sign.toLowerCase()}_horoscope.png`;
         
         try {
-          // Generate image and save to file
+          // Generate image
+          console.log(`Generating image for ${sign}...`);
           const imageBuffer = await pythonBridge.generateHoroscopeImage(sign, horoscope.fullText);
-          await fs.writeFile(imagePath, imageBuffer);
-          horoscope.imagePath = imagePath;
-          console.log(`Generated horoscope image for ${sign} at ${imagePath}`);
+          
+          // Upload to S3
+          console.log(`Uploading ${fileName} to S3...`);
+          const s3Result = await s3Service.uploadFromBuffer(
+            imageBuffer,
+            fileName,
+            s3FolderPath,
+            'image/png'
+          );
+          
+          if (s3Result.success) {
+            // Store the public URL for later use
+            horoscope.imageUrl = s3Result.url;
+            horoscope.s3Key = s3Result.key;
+            console.log(`Successfully uploaded image for ${sign} to S3: ${s3Result.url}`);
+          } else {
+            console.error(`Failed to upload image for ${sign} to S3:`, s3Result.error);
+          }
         } catch (error) {
-          console.error(`Error generating image for ${sign}:`, error);
+          console.error(`Error processing image for ${sign}:`, error);
           // Continue without image if generation fails
         }
       }
@@ -236,6 +250,7 @@ class HoroscopeGenerator {
       // Create post content based on params
       let postText = '';
       const attachments = [];
+      const hasImages = Object.values(horoscopeData).some(h => h.imageUrl);
       
       // Add header if requested
       if (params.addHeader && params.header) {
@@ -247,15 +262,18 @@ class HoroscopeGenerator {
       for (let i = 0; i < signs.length; i++) {
         const horoscope = signs[i];
         
-        // Add sign name and text
-        postText += `🔮 ${horoscope.signName} (${this.formatDate(horoscope.date)})\n${horoscope.fullText}\n\n`;
+        // Only include text if we're not using images or this specific horoscope doesn't have an image
+        if (params.imageType !== 'image' || !horoscope.imageUrl) {
+          postText += `🔮 ${horoscope.signName} (${this.formatDate(horoscope.date)})\n${horoscope.fullText}\n\n`;
+        }
         
         // Add image attachment if any
-        if (params.imageType === 'image' && horoscope.imagePath) {
+        if (horoscope.imageUrl) {
           attachments.push({
             type: 'photo',
-            url: horoscope.imagePath, // Local path to image
-            isCarousel: params.carouselMode
+            url: horoscope.imageUrl,
+            isCarousel: params.carouselMode,
+            s3Key: horoscope.s3Key // Include S3 key for later cleanup
           });
         }
       }
@@ -263,6 +281,11 @@ class HoroscopeGenerator {
       // Add footer if requested
       if (params.addFooter && params.footer) {
         postText += params.footer;
+      }
+
+      // If we have images but no text (only header/footer), add a minimal text
+      if (hasImages && !postText.trim() && params.imageType === 'image') {
+        postText = "Гороскоп на завтра";
       }
       
       return {
