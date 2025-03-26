@@ -187,7 +187,7 @@ class VkPostingService {
         owner_id: communityId, // ID сообщества со знаком минус
         message: postText,
         // Добавляем attachments, если есть
-        attachments: await this.prepareAttachments(attachments, token, communityId),
+        attachments: await this.prepareAttachments(attachments, token, communityId, post),
         // Применяем опции публикации
         ...this.preparePublishOptions(options)
       };
@@ -607,6 +607,97 @@ class VkPostingService {
     }
   }
 
+  /**
+   * Загрузка видео в ВКонтакте
+   * @param {string} videoUrl - URL видео (из S3)
+   * @param {string} token - Токен доступа
+   * @param {string} communityId - ID сообщества
+   * @param {string} title - Название видео
+   * @param {string} description - Описание видео
+   * @returns {Promise<string|null>} Строка с ID видео для VK API
+  */
+  async uploadVideoToVk(videoUrl, token, communityId, title = '', description = '') {
+    try {
+      if (!videoUrl) {
+        throw new Error('Video URL is required');
+      }
+      
+      console.log(`Uploading video from S3: ${videoUrl} to group ${communityId}`);
+      
+      // 1. Получаем ссылку для загрузки видео
+      const uploadServerResponse = await axios.get('https://api.vk.com/method/video.save', {
+        params: {
+          group_id: communityId.replace('-', ''),
+          name: title,
+          description: description,
+          is_private: 0,
+          wallpost: 0, // Не публикуем сразу на стену
+          access_token: token,
+          v: '5.131'
+        }
+      });
+      
+      if (uploadServerResponse.data.error) {
+        throw new Error(`VK API Error: ${uploadServerResponse.data.error.error_msg}`);
+      }
+      
+      const uploadInfo = uploadServerResponse.data.response;
+      console.log(`Got video upload URL: ${uploadInfo.upload_url}`);
+      
+      if (!uploadInfo.upload_url) {
+        throw new Error('Failed to get upload URL from VK API');
+      }
+      
+      // 2. Загружаем видео на сервер ВК
+      // Сначала скачиваем видео с S3, затем загружаем в ВКонтакте
+      const videoResponse = await axios.get(videoUrl, {
+        responseType: 'arraybuffer'
+      });
+      
+      const FormData = require('form-data');
+      const formData = new FormData();
+      formData.append('video_file', Buffer.from(videoResponse.data), {
+        filename: 'video.mp4',
+        contentType: 'video/mp4'
+      });
+      
+      const uploadResponse = await axios.post(uploadInfo.upload_url, formData, {
+        headers: {
+          ...formData.getHeaders()
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      });
+      
+      console.log('Video upload response:', uploadResponse.data);
+      
+      // 3. Проверяем результаты загрузки
+      if (uploadResponse.data.error) {
+        throw new Error(`Error uploading video: ${uploadResponse.data.error}`);
+      }
+      
+      // 4. Формируем идентификатор видео для вложений
+      const videoId = uploadInfo.video_id;
+      const ownerId = uploadInfo.owner_id;
+      
+      if (!videoId || !ownerId) {
+        throw new Error('Failed to get video ID from VK API');
+      }
+      
+      console.log(`Successfully uploaded video with ID: video${ownerId}_${videoId}`);
+      return `video${ownerId}_${videoId}`;
+      
+    } catch (error) {
+      console.error('Error uploading video to VK:', error);
+      
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+      }
+      
+      return null;
+    }
+  }
   /**
    * Подготовка опций публикации
    * @param {Object} options - Опции публикации
