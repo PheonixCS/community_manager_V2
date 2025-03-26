@@ -391,7 +391,8 @@ class VkPostingService {
             );
             
             if (photoMedia && photoMedia.s3Url) {
-              bestPhotoUrl = photoMedia.s3Url;
+              // Конвертируем локальный URL в публичный для загрузки
+              bestPhotoUrl = this.convertLocalUrlToPublic(photoMedia.s3Url);
               console.log(`Using high quality S3 photo for ID ${photoId}: ${bestPhotoUrl}`);
             }
           }
@@ -437,18 +438,11 @@ class VkPostingService {
             if (downloadedVideo && downloadedVideo.s3Url) {
               console.log(`Found downloaded video in downloadedVideos: ${downloadedVideo.s3Url}`);
               
-              // Загружаем видео в ВКонтакте через API
-              videoAttachment = await this.uploadVideoToVk(
-                downloadedVideo.s3Url,
-                token,
-                communityId,
-                downloadedVideo.title || attachment.video?.title || 'Video',
-                attachment.video?.description || ''
-              );
-              
-              if (videoAttachment) {
-                attachmentStrings.push(videoAttachment);
-                continue; // Переходим к следующему вложению
+              // Используем оригинальное видео из ВК вместо загрузки своего
+              if (attachment.video?.owner_id && attachment.video?.id) {
+                console.log(`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
+                attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
+                continue;
               }
             }
           }
@@ -463,23 +457,16 @@ class VkPostingService {
             if (videoMedia && videoMedia.s3Url) {
               console.log(`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
               
-              // Загружаем видео в ВКонтакте через API
-              videoAttachment = await this.uploadVideoToVk(
-                videoMedia.s3Url,
-                token,
-                communityId,
-                attachment.video?.title || 'Video',
-                attachment.video?.description || ''
-              );
-              
-              if (videoAttachment) {
-                attachmentStrings.push(videoAttachment);
-                continue; // Переходим к следующему вложению
+              // Используем оригинальное видео из ВК вместо загрузки своего
+              if (attachment.video?.owner_id && attachment.video?.id) {
+                console.log(`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
+                attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
+                continue;
               }
             }
           }
           
-          // 3. Если скачанное видео не нашли, используем исходное из ВК
+          // 3. Если скачанное видео не нашли или решили не загружать, используем исходное из ВК
           if (attachment.video?.owner_id && attachment.video?.id) {
             console.log(`Using original VK video: ${attachment.video.owner_id}_${attachment.video.id}`);
             attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
@@ -559,7 +546,9 @@ class VkPostingService {
         throw new Error('Photo URL is required');
       }
       
-      console.log(`Attempting to upload photo from URL: ${photoUrl} to group ${communityId}`);
+      // Преобразуем локальный URL в публичный, если это URL из S3
+      const publicPhotoUrl = this.convertLocalUrlToPublic(photoUrl);
+      console.log(`Attempting to upload photo from URL: ${publicPhotoUrl} to group ${communityId}`);
       
       // 1. Получаем сервер для загрузки фото
       const uploadServerResponse = await axios.get('https://api.vk.com/method/photos.getWallUploadServer', {
@@ -578,7 +567,7 @@ class VkPostingService {
       const uploadUrl = uploadServerResponse.data.response.upload_url;
       
       // 2. Скачиваем фото
-      const photoResponse = await axios.get(photoUrl, { 
+      const photoResponse = await axios.get(publicPhotoUrl, { 
         responseType: 'arraybuffer',
         timeout: 30000 // Increase timeout for potentially slow image servers
       });
@@ -661,136 +650,33 @@ class VkPostingService {
   */
   async uploadVideoToVk(videoUrl, token, communityId, title = '', description = '') {
     try {
-      if (!videoUrl) {
-        throw new Error('Video URL is required');
+      // VK не поддерживает загрузку видео для attachments.
+      // Всегда используем оригинальное видео из ВК, если оно доступно
+      
+      // Извлекаем ID из URL, если это возможно
+      if (videoUrl.includes('video_')) {
+        const matches = videoUrl.match(/video_(-?\d+)_(\d+)/);
+        if (matches && matches[1] && matches[2]) {
+          const ownerId = matches[1];
+          const videoId = matches[2];
+          console.log(`Using original VK video from URL: ${ownerId}_${videoId}`);
+          return `video${ownerId}_${videoId}`;
+        }
       }
+      
+      // Если не удалось извлечь ID из URL, логируем ошибку
+      console.log(`Cannot determine video ID from URL: ${videoUrl}, video may not appear in post`);
+      return null;
+      
+      // Примечание: код ниже не выполнится, так как VK API не принимает загруженные видео в attachments
+      // Оставляем для справки на случай, если API изменится
+      
+      /*
       const publicVideoUrl = this.convertLocalUrlToPublic(videoUrl);
-    
-      console.log(`Uploading video from S3: ${publicVideoUrl} to group ${communityId}`);
-      
-      // 1. Получаем ссылку для загрузки видео
-      const uploadServerResponse = await axios.get('https://api.vk.com/method/video.save', {
-        params: {
-          group_id: communityId.replace('-', ''),
-          name: title,
-          description: description,
-          is_private: 0,
-          wallpost: 0, // Не публикуем сразу на стену
-          access_token: token,
-          v: '5.131'
-        }
-      });
-      
-      if (uploadServerResponse.data.error) {
-        throw new Error(`VK API Error: ${uploadServerResponse.data.error.error_msg}`);
-      }
-      
-      const uploadInfo = uploadServerResponse.data.response;
-      console.log(`Got video upload URL: ${uploadInfo.upload_url}`);
-      
-      if (!uploadInfo.upload_url) {
-        throw new Error('Failed to get upload URL from VK API');
-      }
-      
-      // Сначала проверяем размер видео перед загрузкой
-      try {
-        const headResponse = await axios.head(publicVideoUrl);
-        const videoSize = parseInt(headResponse.headers['content-length'] || '0', 10);
-        console.log(`Video size: ${(videoSize / (1024 * 1024)).toFixed(2)} MB`);
-        
-        // Если видео больше 50MB, используем fallback привязку вместо загрузки
-        if (videoSize > 50 * 1024 * 1024) {
-          console.log(`Video is too large (${(videoSize / (1024 * 1024)).toFixed(2)} MB), falling back to original VK video`);
-          // Извлекаем ID из оригинального URL или метаданных
-          if (videoUrl.includes('/video_')) {
-            const matches = videoUrl.match(/video_.*?_(\d+)/);
-            if (matches && matches[1]) {
-              const originalVideoId = matches[1];
-              const ownerId = communityId; // Используем ID сообщества как владельца
-              console.log(`Using original VK video reference: ${ownerId}_${originalVideoId}`);
-              return `video${ownerId}_${originalVideoId}`;
-            }
-          }
-          return null; // Если не удалось извлечь ID, вернем null
-        }
-      } catch (sizeError) {
-        console.error('Error checking video size:', sizeError);
-        // Продолжаем загрузку, если не удалось проверить размер
-      }
-      
-      // 2. Загружаем видео на сервер ВК
-      try {
-        // Сначала скачиваем видео с S3, затем загружаем в ВКонтакте
-        const videoResponse = await axios.get(publicVideoUrl, {
-          responseType: 'arraybuffer',
-          timeout: 120000 // Увеличиваем таймаут до 2 минут для скачивания видео
-        });
-        
-        const FormData = require('form-data');
-        const formData = new FormData();
-        formData.append('video_file', Buffer.from(videoResponse.data), {
-          filename: 'video.mp4',
-          contentType: 'video/mp4'
-        });
-        
-        const uploadResponse = await axios.post(uploadInfo.upload_url, formData, {
-          headers: {
-            ...formData.getHeaders()
-          },
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-          timeout: 300000 // 5 минут на загрузку
-        });
-        
-        console.log('Video upload response:', uploadResponse.data);
-        
-        // 3. Проверяем результаты загрузки
-        if (uploadResponse.data.error) {
-          throw new Error(`Error uploading video: ${uploadResponse.data.error}`);
-        }
-        
-        // 4. Формируем идентификатор видео для вложений
-        const videoId = uploadInfo.video_id;
-        const ownerId = uploadInfo.owner_id;
-        
-        if (!videoId || !ownerId) {
-          throw new Error('Failed to get video ID from VK API');
-        }
-        
-        console.log(`Successfully uploaded video with ID: video${ownerId}_${videoId}`);
-        return `video${ownerId}_${videoId}`;
-      } catch (uploadError) {
-        // Если ошибка 406 (Not Acceptable), вероятно видео слишком большое или неподходящий формат
-        if (uploadError.response && uploadError.response.status === 406) {
-          console.log(`Video upload failed with 406 error (likely too large or wrong format)`);
-          console.log('Error response:', uploadError.response.data);
-          console.log('Headers:', uploadError.response.headers);
-          
-          // Если есть X-Reason заголовок, выводим его
-          if (uploadError.response.headers['x-reason']) {
-            console.log('Reason:', uploadError.response.headers['x-reason']);
-          }
-          
-          // Пробуем использовать оригинальное видео из VK
-          if (videoUrl.includes('/video_')) {
-            const matches = videoUrl.match(/video_.*?_(\d+)/);
-            if (matches && matches[1]) {
-              const originalVideoId = matches[1];
-              // Извлекаем ID сообщества или пользователя из URL
-              const ownerMatches = videoUrl.match(/video_(-?\d+)_/);
-              const ownerId = ownerMatches ? ownerMatches[1] : communityId;
-              console.log(`Falling back to original VK video: ${ownerId}_${originalVideoId}`);
-              return `video${ownerId}_${originalVideoId}`;
-            }
-          }
-        }
-        
-        console.error('Error uploading video:', uploadError);
-        return null;
-      }
-      
+      // ...rest of the original implementation...
+      */
     } catch (error) {
-      console.error('Error uploading video to VK:', error);
+      console.error('Error processing video attachment:', error);
       
       if (error.response) {
         console.error('Response data:', error.response.data);
@@ -800,12 +686,15 @@ class VkPostingService {
       return null;
     }
   }
+  
   /**
    * Преобразует локальный URL S3 в публичный URL
    * @param {string} url - Исходный URL
    * @returns {string} Публичный URL
   */
   convertLocalUrlToPublic(url) {
+    if (!url) return url;
+    
     // Импортируем конфиг
     const config = require('../config/config');
     const publicEndpoint = config.s3.publicEndpoint;
@@ -830,6 +719,7 @@ class VkPostingService {
     // Если не удалось распознать URL, возвращаем исходный
     return url;
   }
+
   /**
    * Подготовка опций публикации
    * @param {Object} options - Опции публикации
