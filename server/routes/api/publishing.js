@@ -248,15 +248,15 @@ router.post('/publish-post', async (req, res) => {
       }
       
       // Check token has the critical permissions
-      const hasWall = token.scope && token.scope.includes('wall');
-      const hasManage = token.scope && token.scope.includes('manage');
+      // const hasWall = token.scope && token.scope.includes('wall');
+      // const hasManage = token.scope && token.scope.includes('manage');
       
-      if (!hasWall || !hasManage) {
-        return res.status(401).json({
-          status: 'error',
-          error: `Токен не имеет необходимых прав. ${!hasWall ? 'Отсутствует право "wall". ' : ''}${!hasManage ? 'Отсутствует право "manage". ' : ''}Пожалуйста, удалите этот токен и авторизуйтесь заново, предоставив все запрашиваемые разрешения.`
-        });
-      }
+      // if (!hasWall || !hasManage) {
+      //   return res.status(401).json({
+      //     status: 'error',
+      //     error: `Токен не имеет необходимых прав. ${!hasWall ? 'Отсутствует право "wall". ' : ''}${!hasManage ? 'Отсутствует право "manage". ' : ''}Пожалуйста, удалите этот токен и авторизуйтесь заново, предоставив все запрашиваемые разрешения.`
+      //   });
+      // }
       
     } catch (tokenError) {
       console.error('Error checking token permissions:', tokenError);
