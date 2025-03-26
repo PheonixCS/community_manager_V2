@@ -621,8 +621,9 @@ class VkPostingService {
       if (!videoUrl) {
         throw new Error('Video URL is required');
       }
-      
-      console.log(`Uploading video from S3: ${videoUrl} to group ${communityId}`);
+      const publicVideoUrl = this.convertLocalUrlToPublic(videoUrl);
+    
+      console.log(`Uploading video from S3: ${publicVideoUrl} to group ${communityId}`);
       
       // 1. Получаем ссылку для загрузки видео
       const uploadServerResponse = await axios.get('https://api.vk.com/method/video.save', {
@@ -650,7 +651,7 @@ class VkPostingService {
       
       // 2. Загружаем видео на сервер ВК
       // Сначала скачиваем видео с S3, затем загружаем в ВКонтакте
-      const videoResponse = await axios.get(videoUrl, {
+      const videoResponse = await axios.get(publicVideoUrl, {
         responseType: 'arraybuffer'
       });
       
@@ -697,6 +698,36 @@ class VkPostingService {
       
       return null;
     }
+  }
+  /**
+   * Преобразует локальный URL S3 в публичный URL
+   * @param {string} url - Исходный URL
+   * @returns {string} Публичный URL
+  */
+  convertLocalUrlToPublic(url) {
+    // Импортируем конфиг
+    const config = require('../config/config');
+    const publicEndpoint = config.s3.publicEndpoint;
+    
+    // Если URL уже использует публичный эндпоинт, возвращаем как есть
+    if (url.includes('krazu-group.tech') || url.includes('your-domain.com')) {
+      return url;
+    }
+    
+    // Проверяем, является ли URL локальным URL для MinIO/S3
+    if (url.includes('localhost:9000') || url.includes('127.0.0.1:9000')) {
+      // Заменяем локальный хост на публичный эндпоинт
+      return url.replace(/http:\/\/(localhost|127\.0\.0\.1):9000/, publicEndpoint);
+    }
+    
+    // Если это путь к S3 без явного указания хоста (например, из mediaDownloads.s3Url)
+    if (url.startsWith('/vk-media/') || url.startsWith('vk-media/')) {
+      const bucketPath = url.startsWith('/') ? url : `/${url}`;
+      return `${publicEndpoint}${bucketPath}`;
+    }
+    
+    // Если не удалось распознать URL, возвращаем исходный
+    return url;
   }
   /**
    * Подготовка опций публикации
