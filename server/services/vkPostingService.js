@@ -152,6 +152,7 @@ class VkPostingService {
         attachments = post.attachments;
 
         console.log(`isCarousel: ${post.isCarousel}`)
+        console.log(`post: ${post}`)
         // Apply transformations from the options (для обратной совместимости)
         if (options.removeHashtags) {
           postText = postText.replace(/#[\wа-яА-ЯёЁ]+/g, '').replace(/\s+/g, ' ').trim();
