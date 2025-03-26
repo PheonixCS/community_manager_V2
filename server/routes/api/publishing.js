@@ -3,7 +3,6 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const publishTaskService = require('../../services/publishTaskService');
 const contentGeneratorService = require('../../services/contentGeneratorService');
-const authMiddleware = require('../../middleware/authMiddleware');
 const publishTaskRepository = require('../../repositories/PublishTaskRepository');
 const PublishTask = require('../../models/PublishTask');
 const PublishHistory = require('../../models/PublishHistory');
@@ -196,9 +195,9 @@ router.get('/history/post/:postId', async (req, res) => {
 /**
  * @route   GET /api/publishing/generators
  * @desc    Get available content generators
- * @access  Private
+ * @access  Public - данный эндпоинт доступен всем (без проверки авторизации)
  */
-router.get('/generators', authMiddleware, async (req, res) => {
+router.get('/generators', async (req, res) => {
   try {
     // Используем сервис напрямую вместо вызова через publishTaskService
     const generators = contentGeneratorService.getAvailableGenerators();
