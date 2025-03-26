@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3b70;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#29539b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="300" height="300" fill="url(#bg-gradient)" />
+  <text x="150" y="80" font-family="Arial" font-size="18" fill="white" text-anchor="middle">25 ФЕВРАЛЯ, ОВЕН</text>
+  <text x="150" y="150" font-family="Arial" font-size="14" fill="white" text-anchor="middle">
+    <tspan x="150" dy="0">Завтра вам предстоит столкнуться с</tspan>
+    <tspan x="150" dy="20">неожиданными поворотами судьбы.</tspan>
+    <tspan x="150" dy="20">Будьте готовы к переменам и не</tspan>
+    <tspan x="150" dy="20">бойтесь новых возможностей.</tspan>
+  </text>
+  <text x="60" y="280" font-family="Arial" font-size="18" fill="white">8</text>
+  <text x="120" y="280" font-family="Arial" font-size="18" fill="white">7</text>
+  <text x="180" y="280" font-family="Arial" font-size="18" fill="white">9</text>
+  <text x="240" y="280" font-family="Arial" font-size="18" fill="white">6</text>
+</svg>

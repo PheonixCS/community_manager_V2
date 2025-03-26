@@ -15,25 +15,58 @@ class ContentGeneratorService {
    */
   loadGenerators() {
     try {
+      console.log('Loading content generators...');
       // Загружаем встроенные генераторы
       const generatorsPath = path.join(__dirname, 'contentGenerators');
-      if (fs.existsSync(generatorsPath)) {
-        fs.readdirSync(generatorsPath)
-          .filter(file => file.endsWith('.js'))
-          .forEach(file => {
-            try {
-              const generator = require(path.join(generatorsPath, file));
-              if (generator && generator.id && generator.generateContent) {
-                this.generators.set(generator.id, generator);
-                console.log(`Loaded content generator: ${generator.name || generator.id}`);
-              }
-            } catch (error) {
-              console.error(`Error loading generator from file ${file}:`, error);
-            }
-          });
+      console.log(`Checking for generators in path: ${generatorsPath}`);
+      
+      if (!fs.existsSync(generatorsPath)) {
+        console.warn(`Generators path does not exist: ${generatorsPath}`);
+        fs.mkdirSync(generatorsPath, { recursive: true });
+        console.log(`Created generators directory: ${generatorsPath}`);
       }
       
+      const files = fs.readdirSync(generatorsPath);
+      console.log(`Found ${files.length} files in generators directory`);
+      
+      const generatorFiles = files.filter(file => file.endsWith('.js'));
+      console.log(`Found ${generatorFiles.length} JavaScript files in generators directory`);
+      
+      // Очищаем текущие генераторы перед загрузкой
+      this.generators.clear();
+      
+      generatorFiles.forEach(file => {
+        try {
+          console.log(`Attempting to load generator from file: ${file}`);
+          // Очищаем кеш модуля перед загрузкой, чтобы обеспечить свежую версию
+          const modulePath = path.join(generatorsPath, file);
+          delete require.cache[require.resolve(modulePath)];
+          
+          const generator = require(modulePath);
+          
+          if (generator && generator.id && typeof generator.generateContent === 'function') {
+            this.generators.set(generator.id, generator);
+            console.log(`Successfully loaded content generator: ${generator.name || generator.id}`);
+          } else {
+            console.warn(`Skipping invalid generator in file ${file}. Missing id or generateContent method.`);
+            if (generator) {
+              console.warn(`Generator details: id=${generator.id}, hasGenerateMethod=${!!generator.generateContent}`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error loading generator from file ${file}:`, error);
+        }
+      });
+      
       console.log(`Total content generators loaded: ${this.generators.size}`);
+      if (this.generators.size === 0) {
+        console.log('No generators were loaded. Check if the generator files exist and are valid.');
+      } else {
+        // Показать загруженные генераторы
+        for (const [id, generator] of this.generators.entries()) {
+          console.log(`> Loaded generator: ${id} (${generator.name || 'unnamed'})`);
+        }
+      }
     } catch (error) {
       console.error('Error loading content generators:', error);
     }

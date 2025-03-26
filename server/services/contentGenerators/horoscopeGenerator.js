@@ -287,4 +287,11 @@ class HoroscopeGenerator {
   }
 }
 
-module.exports = new HoroscopeGenerator();
+// Убедимся, что файл существует и экспортирует объект с правильной структурой
+console.log('Loading horoscope generator...');
+
+// Проверка на экспорт
+const generator = new HoroscopeGenerator();
+console.log('Horoscope generator initialized with id:', generator.id);
+
+module.exports = generator;

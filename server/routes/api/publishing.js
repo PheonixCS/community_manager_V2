@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
 const publishTaskService = require('../../services/publishTaskService');
+const contentGeneratorService = require('../../services/contentGeneratorService');
+const authMiddleware = require('../../middleware/authMiddleware');
 const publishTaskRepository = require('../../repositories/PublishTaskRepository');
 const PublishTask = require('../../models/PublishTask');
 const PublishHistory = require('../../models/PublishHistory');
@@ -191,16 +194,30 @@ router.get('/history/post/:postId', async (req, res) => {
 });
 
 /**
- * Получение списка доступных генераторов контента
- * GET /api/publishing/generators
+ * @route   GET /api/publishing/generators
+ * @desc    Get available content generators
+ * @access  Private
  */
-router.get('/generators', (req, res) => {
+router.get('/generators', authMiddleware, async (req, res) => {
   try {
-    const generators = publishTaskService.getAvailableContentGenerators();
-    res.json(generators);
+    // Используем сервис напрямую вместо вызова через publishTaskService
+    const generators = contentGeneratorService.getAvailableGenerators();
+    console.log(`Retrieved ${generators.length} content generators`);
+    
+    // Если список пуст, проверим, что генераторы загружены
+    if (generators.length === 0) {
+      // Попробуем перезагрузить генераторы
+      contentGeneratorService.loadGenerators();
+      const reloadedGenerators = contentGeneratorService.getAvailableGenerators();
+      console.log(`After reload: ${reloadedGenerators.length} content generators`);
+      
+      return res.json(reloadedGenerators);
+    }
+    
+    return res.json(generators);
   } catch (error) {
     console.error('Error fetching content generators:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error fetching content generators' });
   }
 });
 
