@@ -163,7 +163,7 @@ class VkApiService {
     if (!text) return false;
   
     // Regex to match URLs (including VK mentions)
-    const urlRegex = /(?:https?:\/\/|www\.)[^\s$$$$]+/gi;
+    const urlRegex = /(?:https?:\/\/|www\.)[^\s[\]]+/gi;
     // Regex to match VK mention format [id123|Name] or [club123|Name]
     
     const regex = /\[(club|id)\d+\|([^\]]+)\]/g;

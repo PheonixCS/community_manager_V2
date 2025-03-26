@@ -589,9 +589,9 @@ class PublishTaskService {
   }
 
   /**
-   * Получение доступных генераторов контента
-   * @returns {Array<Object>} Массив генераторов
-   */
+   * Добавление постов к задаче публикации
+   * @param {string} taskId - ID задачи
+   * @param {Array<string>} postIds - Массив ID постов
   getAvailableContentGenerators() {
     return contentGeneratorService.getAvailableGenerators();
   }

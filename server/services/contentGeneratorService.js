@@ -1,71 +1,101 @@
-const dummyGenerator = require('../generators/DummyContentGenerator');
+const fs = require('fs');
+const path = require('path');
 
 /**
- * Сервис для работы с генераторами контента
+ * Сервис для управления генераторами контента
  */
 class ContentGeneratorService {
   constructor() {
-    // Регистрируем доступные генераторы
     this.generators = new Map();
-    this.registerGenerator(dummyGenerator);
+    this.loadGenerators();
   }
 
   /**
-   * Регистрация генератора контента
-   * @param {ContentGenerator} generator - Экземпляр генератора
+   * Загружает все доступные генераторы контента
    */
-  registerGenerator(generator) {
-    const id = generator.getId();
-    this.generators.set(id, generator);
-    console.log(`Content generator "${generator.getName()}" (${id}) registered`);
-  }
-
-  /**
-   * Получение списка доступных генераторов
-   * @returns {Array<Object>} Массив с информацией о генераторах
-   */
-  getAvailableGenerators() {
-    const result = [];
-    for (const [id, generator] of this.generators.entries()) {
-      result.push({
-        id,
-        name: generator.getName(),
-        params: generator.getParamsDescription()
-      });
+  loadGenerators() {
+    try {
+      // Загружаем встроенные генераторы
+      const generatorsPath = path.join(__dirname, 'contentGenerators');
+      if (fs.existsSync(generatorsPath)) {
+        fs.readdirSync(generatorsPath)
+          .filter(file => file.endsWith('.js'))
+          .forEach(file => {
+            try {
+              const generator = require(path.join(generatorsPath, file));
+              if (generator && generator.id && generator.generateContent) {
+                this.generators.set(generator.id, generator);
+                console.log(`Loaded content generator: ${generator.name || generator.id}`);
+              }
+            } catch (error) {
+              console.error(`Error loading generator from file ${file}:`, error);
+            }
+          });
+      }
+      
+      console.log(`Total content generators loaded: ${this.generators.size}`);
+    } catch (error) {
+      console.error('Error loading content generators:', error);
     }
-    return result;
   }
 
   /**
-   * Получение генератора по ID
+   * Генерирует контент с использованием указанного генератора
    * @param {string} generatorId - ID генератора
-   * @returns {ContentGenerator|null} Экземпляр генератора или null
-   */
-  getGenerator(generatorId) {
-    return this.generators.get(generatorId) || null;
-  }
-
-  /**
-   * Генерация контента
-   * @param {string} generatorId - ID генератора
-   * @param {Object} params - Параметры для генерации
-   * @returns {Promise<Object|null>} Сгенерированный контент или null
+   * @param {Object} params - Параметры генерации
+   * @returns {Promise<Object>} Сгенерированный контент
    */
   async generateContent(generatorId, params = {}) {
-    const generator = this.getGenerator(generatorId);
-    
-    if (!generator) {
-      console.error(`Content generator with ID "${generatorId}" not found`);
-      return null;
-    }
-    
     try {
-      console.log(`Generating content using "${generator.getName()}" with params:`, params);
-      return await generator.generateContent(params);
+      const generator = this.generators.get(generatorId);
+      
+      if (!generator) {
+        throw new Error(`Generator with ID "${generatorId}" not found`);
+      }
+      
+      console.log(`Generating content with ${generator.name || generator.id}...`);
+      
+      // Передаем управление генератору
+      const content = await generator.generateContent(params);
+      
+      if (!content) {
+        throw new Error('Generator returned empty content');
+      }
+      
+      // Проверяем обязательные поля
+      if (typeof content.text !== 'string' && !Array.isArray(content.attachments)) {
+        throw new Error('Generated content must have either text or attachments');
+      }
+      
+      return content;
     } catch (error) {
-      console.error(`Error generating content with generator "${generatorId}":`, error);
-      return null;
+      console.error('Error generating content:', error);
+      throw error;
     }
+  }
+
+  /**
+   * Получение доступных генераторов контента
+   * @returns {Array<Object>} Массив генераторов
+   */
+  getAvailableGenerators() {
+    // Возвращаем массив с информацией о генераторах (без методов)
+    return Array.from(this.generators.values()).map(generator => ({
+      id: generator.id,
+      name: generator.name || generator.id,
+      description: generator.description || '',
+      params: generator.params || []
+    }));
+  }
+
+  /**
+   * Получение параметров генератора по ID
+   * @param {string} generatorId - ID генератора
+   * @returns {Array<Object>} Массив параметров
+   */
+  getGeneratorParams(generatorId) {
+    const generator = this.generators.get(generatorId);
+    return generator ? generator.params || [] : [];
   }
 }
 
