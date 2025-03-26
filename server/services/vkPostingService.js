@@ -335,7 +335,7 @@ class VkPostingService {
         if (attachment.type === 'photo') {
           // Загружаем фото на сервер ВК
           const photoAttachment = await this.queuePhotoUpload(
-            attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[0]?.url,
+            attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[-1]?.url,
             token,
             communityId
           );
