@@ -359,8 +359,8 @@ router.post('/publish-generated', async (req, res) => {
       });
     }
     
-    // Генерируем контент
-    const generatedContent = await publishTaskService.contentGeneratorService.generateContent(
+    // Генерируем контент - исправляем прямой вызов contentGeneratorService вместо доступа через publishTaskService
+    const generatedContent = await contentGeneratorService.generateContent(
       generatorId,
       params
     );

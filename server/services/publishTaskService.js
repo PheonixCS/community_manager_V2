@@ -435,7 +435,8 @@ class PublishTaskService {
    */
   async executeGeneratorTask(task, result) {
     try {
-      // Генерируем контент
+      // Генерируем контент - используем сервис напрямую
+      const contentGeneratorService = require('./contentGeneratorService');
       const generatedContent = await contentGeneratorService.generateContent(
         task.contentGeneratorSettings.generatorId,
         task.contentGeneratorSettings.params
@@ -599,6 +600,7 @@ class PublishTaskService {
    * @returns {Array<Object>} Список генераторов с их параметрами
    */
   getAvailableContentGenerators() {
+    const contentGeneratorService = require('./contentGeneratorService');
     return contentGeneratorService.getAvailableGenerators();
   }
 

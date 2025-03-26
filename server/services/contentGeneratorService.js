@@ -80,9 +80,18 @@ class ContentGeneratorService {
    */
   async generateContent(generatorId, params = {}) {
     try {
+      console.log(`Attempting to generate content with generator: ${generatorId}`);
+      
+      // Reload generators to ensure we have the latest version
+      if (this.generators.size === 0) {
+        console.log('No generators loaded, attempting to load them now');
+        this.loadGenerators();
+      }
+      
       const generator = this.generators.get(generatorId);
       
       if (!generator) {
+        console.error(`Generator with ID "${generatorId}" not found. Available generators: ${[...this.generators.keys()].join(', ')}`);
         throw new Error(`Generator with ID "${generatorId}" not found`);
       }
       

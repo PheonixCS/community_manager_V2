@@ -54,6 +54,7 @@ const ZODIAC_DICT = {
 class HoroscopeImageGenerator {
   constructor() {
     // Initialize paths
+    console.log('Initializing HoroscopeImageGenerator');
     const resourcesPath = path.join(__dirname, '../../resources');
     this.ensureResourcesExist(resourcesPath);
     
@@ -76,6 +77,9 @@ class HoroscopeImageGenerator {
     } catch (error) {
       console.error('Error registering fonts:', error);
     }
+
+    // Check if fonts exist and create default ones if they don't
+    this.ensureFontsExist(path.join(path.dirname(this.headerFont)));
   }
 
   ensureResourcesExist(resourcesPath) {
@@ -87,8 +91,26 @@ class HoroscopeImageGenerator {
     }
   }
 
+  ensureFontsExist(fontsPath) {
+    console.log(`Checking fonts in: ${fontsPath}`);
+    try {
+      if (!fs.existsSync(this.headerFont)) {
+        console.log(`Header font not found at: ${this.headerFont}, using system font`);
+      }
+      if (!fs.existsSync(this.bodyFont)) {
+        console.log(`Body font not found at: ${this.bodyFont}, using system font`);
+      }
+      if (!fs.existsSync(this.fontRate)) {
+        console.log(`Rate font not found at: ${this.fontRate}, using system font`);
+      }
+    } catch (error) {
+      console.error('Error checking fonts:', error);
+    }
+  }
+
   async generateHoroscopeImage(zodiacSign, text) {
     try {
+      console.log(`Generating horoscope image for ${zodiacSign} with text length: ${text?.length}`);
       // Create canvas (1080x1080)
       const canvas = createCanvas(1080, 1080);
       const ctx = canvas.getContext('2d');
@@ -133,8 +155,72 @@ class HoroscopeImageGenerator {
       return canvas.toBuffer('image/png');
     } catch (error) {
       console.error('Error generating horoscope image:', error);
-      throw error;
+      // Create a fallback image with error message
+      return this.generateFallbackImage(zodiacSign, error.message);
     }
+  }
+
+  // Add fallback image generation for error cases
+  async generateFallbackImage(zodiacSign, errorMessage) {
+    try {
+      const canvas = createCanvas(1080, 1080);
+      const ctx = canvas.getContext('2d');
+      
+      // Create gradient background
+      const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+      gradient.addColorStop(0, '#1e3b70');
+      gradient.addColorStop(1, '#29539b');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1080, 1080);
+
+      // Draw header
+      ctx.font = '80px Arial'; // Use standard font as fallback
+      ctx.fillStyle = 'white';
+      const header = `${new Date().getDate()} ${new Date().toLocaleString('ru', { month: 'long' }).toUpperCase()}, ${ZODIAC_DICT[zodiacSign]}`;
+      const headerWidth = ctx.measureText(header).width;
+      const headerX = (1080 - headerWidth) / 2;
+      ctx.fillText(header, headerX, 100);
+      
+      // Draw error message
+      ctx.font = '40px Arial';
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+      ctx.fillText('Ошибка при генерации изображения:', 540, 400);
+      
+      // Draw error details
+      ctx.font = '30px Arial';
+      const lines = this.wrapText(ctx, errorMessage, 900);
+      lines.forEach((line, i) => {
+        ctx.fillText(line, 540, 450 + i * 40);
+      });
+      
+      return canvas.toBuffer('image/png');
+    } catch (secondError) {
+      console.error('Error generating fallback image:', secondError);
+      // If even fallback fails, return empty buffer
+      return Buffer.from([]);
+    }
+  }
+  
+  wrapText(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = words[0];
+
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const width = ctx.measureText(`${currentLine} ${word}`).width;
+      
+      if (width < maxWidth) {
+        currentLine += ` ${word}`;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    
+    lines.push(currentLine);
+    return lines;
   }
 
   getTomorrowHeader(zodiacSign) {
@@ -239,4 +325,6 @@ class HoroscopeImageGenerator {
   }
 }
 
-module.exports = new HoroscopeImageGenerator();
+const generator = new HoroscopeImageGenerator();
+console.log('HoroscopeImageGenerator initialized successfully');
+module.exports = generator;
