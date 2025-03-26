@@ -150,7 +150,16 @@ router.get('/tasks/:id/history', async (req, res) => {
   try {
     const history = await publishTaskService.getTaskHistory(req.params.id);
     
-    res.json(history);
+    // Format response consistently
+    res.json({
+      data: history,
+      pagination: {
+        total: history.length,
+        page: 1,
+        limit: history.length,
+        pages: 1
+      }
+    });
   } catch (error) {
     console.error(`Error fetching history for task ${req.params.id}:`, error);
     res.status(500).json({ error: error.message });
@@ -165,7 +174,16 @@ router.get('/history/post/:postId', async (req, res) => {
   try {
     const history = await publishTaskService.getPostPublishHistory(req.params.postId);
     
-    res.json(history);
+    // Format response consistently
+    res.json({
+      data: history,
+      pagination: {
+        total: history.length,
+        page: 1,
+        limit: history.length,
+        pages: 1
+      }
+    });
   } catch (error) {
     console.error(`Error fetching publish history for post ${req.params.postId}:`, error);
     res.status(500).json({ error: error.message });

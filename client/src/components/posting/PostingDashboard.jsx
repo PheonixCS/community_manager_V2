@@ -39,16 +39,24 @@ const PostingDashboard = () => {
       ]);
 
       setTasks(tasksResponse.data.data || []);
-      setRecentHistory(historyResponse.data || []);
+      setRecentHistory(historyResponse.data.data || []); // Fix to properly access paginated data
+
+      // Properly handle token validation
+      const tokens = tokensResponse.data || [];
+      const hasActiveToken = tokens.some(token => {
+        // Check if token is active and not expired
+        const isActive = token.isActive;
+        const isExpired = token.expiresAt && Math.floor(Date.now() / 1000) >= token.expiresAt;
+        return isActive && !isExpired;
+      });
       
-      // Check if there is at least one active token
       setAuthStatus({
-        hasActiveToken: tokensResponse.data.some(token => token.isActive && !isTokenExpired(token.expiresAt)),
+        hasActiveToken,
         error: null
       });
       
-      // Calculate stats
-      calculateStats(tasksResponse.data.data, historyResponse.data);
+      // Calculate stats with proper data handling
+      calculateStats(tasksResponse.data.data || [], historyResponse.data.data || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setAuthStatus({
@@ -60,23 +68,25 @@ const PostingDashboard = () => {
     }
   };
 
-  const isTokenExpired = (expiresAt) => {
-    return Math.floor(Date.now() / 1000) >= expiresAt;
-  };
+  // Remove the redundant isTokenExpired function since we're doing the check inline
 
   const calculateStats = (tasks, history) => {
-    const publishedCount = history.filter(item => item.status === 'success').length;
-    const failedCount = history.filter(item => item.status === 'failed').length;
+    // Ensure we have arrays
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+    const historyArray = Array.isArray(history) ? history : [];
+    
+    const publishedCount = historyArray.filter(item => item && item.status === 'success').length;
+    const failedCount = historyArray.filter(item => item && item.status === 'failed').length;
     
     const taskStats = {
-      totalTasks: tasks.length,
-      activeTasks: tasks.filter(task => 
-        (task.type === 'schedule' && task.schedule.active) || 
-        (task.type === 'one_time' && !task.oneTime.executed)
+      totalTasks: tasksArray.length,
+      activeTasks: tasksArray.filter(task => 
+        task && ((task.type === 'schedule' && task.schedule?.active) || 
+        (task.type === 'one_time' && !task.oneTime?.executed))
       ).length,
-      scheduleTasks: tasks.filter(task => task.type === 'schedule').length,
-      oneTimeTasks: tasks.filter(task => task.type === 'one_time').length,
-      withGenerator: tasks.filter(task => task.useContentGenerator).length
+      scheduleTasks: tasksArray.filter(task => task && task.type === 'schedule').length,
+      oneTimeTasks: tasksArray.filter(task => task && task.type === 'one_time').length,
+      withGenerator: tasksArray.filter(task => task && task.useContentGenerator).length
     };
     
     const publishStats = {
