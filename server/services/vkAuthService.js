@@ -2,6 +2,7 @@ const axios = require('axios');
 const VkUserToken = require('../models/VkUserToken');
 const Settings = require('../models/Settings');
 const config = require('../config/config');
+const VkToken = require('../models/VkToken');
 
 /**
  * Сервис для авторизации в ВК и управления токенами
@@ -188,8 +189,8 @@ class VkAuthService {
         throw new Error('VK App ID or Secret not configured');
       }
 
-      // Get device_id if it was provided in the callback
-      const device_id = req.query.device_id || 'web_default_device';
+      // Get device_id if it was provided (note: removed incorrect req reference)
+      const device_id = 'web_default_device';
 
       // Log the redirect URI to verify it matches
       console.log('Using redirect URI for token exchange:', finalRedirectUri);
@@ -406,7 +407,7 @@ class VkAuthService {
    * @param {string|string[]} requiredScope - Необходимые разрешения
    * @returns {Promise<Object|null>} Токен доступа или null, если нет подходящего токена
    */
-  async getActiveToken(requiredScope) {
+  async getActiveToken(requiredScope = []) {
     try {
       const scopeArray = Array.isArray(requiredScope) ? requiredScope : [requiredScope];
       

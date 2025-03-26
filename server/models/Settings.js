@@ -46,11 +46,19 @@ const SettingsSchema = new mongoose.Schema({
       default: '5.131'
     }
   },
+  // Add VK groups for manual publishing
+  vkGroups: {
+    type: [{
+      id: String,
+      name: String
+    }],
+    default: []
+  },
   updatedAt: {
     type: Date,
     default: Date.now
   }
-});
+}, { timestamps: true });
 
 // Добавляем метод для преобразования в JSON, исключающий поле serviceToken
 SettingsSchema.methods.toJSON = function() {

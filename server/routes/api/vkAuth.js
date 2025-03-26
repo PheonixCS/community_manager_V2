@@ -66,4 +66,61 @@ router.get('/status', async (req, res) => {
   }
 });
 
+/**
+ * Получение групп пользователя из ВКонтакте
+ * GET /api/vk-auth/groups
+ */
+router.get('/groups', async (req, res) => {
+  try {
+    const vkAuthService = require('../../services/vkAuthService');
+    const token = await vkAuthService.getActiveToken(['groups']);
+    
+    if (!token) {
+      return res.status(401).json({ 
+        error: 'Не найден активный токен ВКонтакте с правами на доступ к группам' 
+      });
+    }
+    
+    // Use VK API to get groups where user is admin
+    const axios = require('axios');
+    const response = await axios.get('https://api.vk.com/method/groups.get', {
+      params: {
+        access_token: token.accessToken,
+        filter: 'admin',
+        extended: 1,
+        v: '5.131'
+      }
+    });
+    
+    if (response.data.error) {
+      throw new Error(`VK API Error: ${response.data.error.error_msg}`);
+    }
+    
+    const groups = response.data.response.items || [];
+    
+    // Save groups to settings for future use
+    try {
+      const Settings = require('../../models/Settings');
+      let settings = await Settings.findOne({}) || new Settings({});
+      
+      // Format groups for storage
+      const formattedGroups = groups.map(group => ({
+        id: `-${group.id}`,
+        name: group.name
+      }));
+      
+      settings.vkGroups = formattedGroups;
+      await settings.save();
+    } catch (settingsError) {
+      console.error('Error saving groups to settings:', settingsError);
+      // Continue even if settings save fails
+    }
+    
+    res.json(response.data.response); // Return the full response object
+  } catch (error) {
+    console.error('Error fetching VK groups:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

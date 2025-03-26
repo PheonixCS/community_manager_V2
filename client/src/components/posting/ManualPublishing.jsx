@@ -15,6 +15,48 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
+// Group selection component with better error handling and fallback
+const GroupSelection = ({ 
+  selectedGroupId, 
+  handleGroupSelect, 
+  targetGroups, 
+  groupsLoading, 
+  error 
+}) => {
+  return (
+    <FormControl fullWidth margin="normal">
+      <InputLabel id="group-select-label">Выберите целевую группу</InputLabel>
+      <Select
+        labelId="group-select-label"
+        value={selectedGroupId}
+        onChange={handleGroupSelect}
+        label="Выберите целевую группу"
+        disabled={groupsLoading}
+        startAdornment={groupsLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+        error={!!error}
+      >
+        <MenuItem value="">
+          <em>Выберите группу</em>
+        </MenuItem>
+        {targetGroups.length > 0 ? (
+          targetGroups.map((group) => (
+            <MenuItem key={group.id} value={group.id}>
+              {group.name || group.id}
+            </MenuItem>
+          ))
+        ) : (
+          <MenuItem disabled>Нет доступных групп</MenuItem>
+        )}
+      </Select>
+      {error && (
+        <Typography color="error" variant="caption">
+          {error}
+        </Typography>
+      )}
+    </FormControl>
+  );
+};
+
 const ManualPublishing = () => {
   // Tab state
   const [tabValue, setTabValue] = useState(0);
@@ -48,6 +90,10 @@ const ManualPublishing = () => {
   });
   const [publishingInProgress, setPublishingInProgress] = useState(false);
   const [authStatus, setAuthStatus] = useState({ hasActiveToken: false });
+  
+  // Add state for error tracking
+  const [groupError, setGroupError] = useState(null);
+  const [postError, setPostError] = useState(null);
   
   useEffect(() => {
     // Check authentication status
@@ -110,9 +156,9 @@ const ManualPublishing = () => {
     try {
       const response = await axios.get('/api/posts', {
         params: { 
-          limit: 50,
-          sortBy: 'viewRate',
-          sortOrder: 'desc'
+          limit: 50, 
+          sortBy: 'viewRate', 
+          sortOrder: 'desc' 
         }
       });
       setPosts(response.data.data);
@@ -126,24 +172,74 @@ const ManualPublishing = () => {
   
   const fetchGroups = async () => {
     setGroupsLoading(true);
+    setGroupError(null);
+    
     try {
-      // Использование правильного эндпоинта
-      const response = await axios.get('/api/settings');
-      // Предполагаем, что группы хранятся в поле vkGroups
-      setTargetGroups(response.data.vkGroups || []);
+      // First try to get groups from VK API through our backend
+      const response = await axios.get('/api/vk-auth/groups');
+      
+      if (response.data && Array.isArray(response.data.items) && response.data.items.length > 0) {
+        // Format the groups data from VK API (the items are in response.items due to VK API format)
+        const formattedGroups = response.data.items.map(group => ({
+          id: `-${group.id}`, // Ensure ID is negative and a string
+          name: group.name
+        }));
+        
+        setTargetGroups(formattedGroups);
+        console.log('Loaded groups from VK API:', formattedGroups);
+        
+        // Save to localStorage as backup
+        localStorage.setItem('vkTargetGroups', JSON.stringify(formattedGroups));
+      } else {
+        // Try alternate endpoints
+        await fetchGroupsAlternate();
+      }
     } catch (error) {
-      console.error('Error fetching groups:', error);
-      
-      // Fallback для тестирования
-      setTargetGroups([
-        { id: '-123456789', name: 'Тестовая группа 1' },
-        { id: '-987654321', name: 'Тестовая группа 2' }
-      ]);
-      
-      showSnackbar('Ошибка при загрузке целевых групп', 'error');
+      console.error('Error fetching groups from VK API:', error);
+      await fetchGroupsAlternate();
     } finally {
       setGroupsLoading(false);
     }  
+  };
+  
+  const fetchGroupsAlternate = async () => {
+    try {
+      // Fallback to settings if no groups from VK API
+      const settingsResponse = await axios.get('/api/settings');
+      
+      if (settingsResponse.data && settingsResponse.data.vkGroups && 
+          Array.isArray(settingsResponse.data.vkGroups) && 
+          settingsResponse.data.vkGroups.length > 0) {
+        
+        setTargetGroups(settingsResponse.data.vkGroups);
+        console.log('Loaded groups from settings:', settingsResponse.data.vkGroups);
+        return;
+      }
+      
+      // If still no groups, check if we have any saved groups in local storage
+      const savedGroups = localStorage.getItem('vkTargetGroups');
+      if (savedGroups) {
+        try {
+          const parsedGroups = JSON.parse(savedGroups);
+          if (Array.isArray(parsedGroups) && parsedGroups.length > 0) {
+            setTargetGroups(parsedGroups);
+            console.log('Loaded groups from local storage:', parsedGroups);
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to parse saved groups', e);
+        }
+      }
+      
+      // If all else fails, show an error
+      setGroupError('Не удалось загрузить список групп. Убедитесь, что вы авторизованы в ВКонтакте и имеете права администратора хотя бы в одном сообществе.');
+      setTargetGroups([]);
+      
+    } catch (error) {
+      console.error('Error in fallback group loading:', error);
+      setGroupError('Ошибка при загрузке групп: ' + (error.response?.data?.error || error.message));
+      setTargetGroups([]);
+    }
   };
   
   const fetchGenerators = async () => {
@@ -159,6 +255,11 @@ const ManualPublishing = () => {
     }
   };
   
+  // Add debug output
+  useEffect(() => {
+    console.log('Target groups state:', targetGroups);
+  }, [targetGroups]);
+
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
@@ -206,7 +307,7 @@ const ManualPublishing = () => {
       const response = await axios.post('/api/publishing/publish-post', {
         postId: selectedPostId,
         communityId: selectedGroupId,
-        options: publishOptions
+        options: publishOptions,
       });
       
       if (response.data.status === 'success') {
@@ -407,7 +508,6 @@ const ManualPublishing = () => {
                   ))}
                 </Select>
               </FormControl>
-              
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
                   startIcon={<RefreshIcon />}
@@ -420,26 +520,25 @@ const ManualPublishing = () => {
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel id="group-select-label">Выберите целевую группу</InputLabel>
-                <Select
-                  labelId="group-select-label"
-                  value={selectedGroupId}
-                  onChange={handleGroupSelect}
-                  label="Выберите целевую группу"
+              {/* Replace simple FormControl with our enhanced component */}
+              <GroupSelection
+                selectedGroupId={selectedGroupId}
+                handleGroupSelect={handleGroupSelect}
+                targetGroups={targetGroups}
+                groupsLoading={groupsLoading}
+                error={groupError}
+              />
+              {/* Add a refresh button specifically for groups */}
+              <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  size="small"
+                  startIcon={<RefreshIcon />}
+                  onClick={fetchGroups}
                   disabled={groupsLoading}
-                  startAdornment={groupsLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
                 >
-                  <MenuItem value="">
-                    <em>Выберите группу</em>
-                  </MenuItem>
-                  {targetGroups.map((group) => (
-                    <MenuItem key={group.id} value={group.id}>
-                      {group.name || group.id}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  Обновить список групп
+                </Button>
+              </Box>
             </Grid>
             
             <Grid item xs={12}>
@@ -534,14 +633,14 @@ const ManualPublishing = () => {
                   ))}
                 </Select>
               </FormControl>
-              
+
               {generatorMetadata && (
                 <Card variant="outlined" sx={{ mt: 2 }}>
                   <CardContent>
                     <Typography variant="subtitle1" gutterBottom>
                       Параметры генератора
                     </Typography>
-                    
+                     
                     {generatorMetadata.params.map((param) => (
                       <Box key={param.name}>
                         {getParamInput(param)}
@@ -553,27 +652,28 @@ const ManualPublishing = () => {
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel id="target-group-select-label">Выберите целевую группу</InputLabel>
-                <Select
-                  labelId="target-group-select-label"
-                  value={selectedGroupId}
-                  onChange={handleGroupSelect}
-                  label="Выберите целевую группу"
+              {/* Replace simple FormControl with our enhanced component */}              
+              <GroupSelection
+                selectedGroupId={selectedGroupId}
+                handleGroupSelect={handleGroupSelect}
+                targetGroups={targetGroups}
+                groupsLoading={groupsLoading}
+                error={groupError}
+              />
+              {/* Add a refresh button specifically for groups */}
+              <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  size="small"
+                  startIcon={<RefreshIcon />}
+                  onClick={fetchGroups}
                   disabled={groupsLoading}
-                  startAdornment={groupsLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
                 >
-                  <MenuItem value="">
-                    <em>Выберите группу</em>
-                  </MenuItem>
-                  {targetGroups.map((group) => (
-                    <MenuItem key={group.id} value={group.id}>
-                      {group.name || group.id}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              
+                  Обновить список групп
+                </Button>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12}>
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle1" gutterBottom>
                 Настройки публикации
