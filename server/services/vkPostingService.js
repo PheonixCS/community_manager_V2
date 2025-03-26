@@ -372,8 +372,55 @@ class VkPostingService {
           }
         }
         else if (attachment.type === 'video') {
-          // Для видео можно использовать существующие ID или загружать новые
+          // Определяем лучший источник видео
+          let videoAttachment = null;
+          
+          // 1. Проверяем, есть ли скачанное видео в mediaDownloads
+          if (attachment.mediaDownloads && attachment.mediaDownloads.length > 0) {
+            const videoMedia = attachment.mediaDownloads.find(m => m.type === 'video');
+            if (videoMedia && videoMedia.s3Url) {
+              console.log(`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
+              // Загружаем видео в ВК через API
+              videoAttachment = await this.uploadVideoToVk(
+                videoMedia.s3Url, 
+                token, 
+                communityId,
+                attachment.video?.title || 'Video',
+                attachment.video?.description || ''
+              );
+              
+              if (videoAttachment) {
+                attachmentStrings.push(videoAttachment);
+                continue; // Переходим к следующему вложению
+              }
+            }
+          }
+          if (!videoAttachment && attachment.video?.id && attachment.downloadedVideos) {
+            const downloadedVideo = attachment.downloadedVideos.find(v => 
+              v.videoId === String(attachment.video.id)
+            );
+            
+            if (downloadedVideo && downloadedVideo.s3Url) {
+              console.log(`Found downloaded video in downloadedVideos: ${downloadedVideo.s3Url}`);
+              // Загружаем видео в ВК через API
+              videoAttachment = await this.uploadVideoToVk(
+                downloadedVideo.s3Url,
+                token,
+                communityId,
+                downloadedVideo.title || attachment.video?.title || 'Video',
+                attachment.video?.description || ''
+              );
+              
+              if (videoAttachment) {
+                attachmentStrings.push(videoAttachment);
+                continue; // Переходим к следующему вложению
+              }
+            }
+          }
+          
+          // 3. Если видео скачанное не нашли, используем исходное из ВК
           if (attachment.video?.owner_id && attachment.video?.id) {
+            console.log(`Using original VK video: ${attachment.video.owner_id}_${attachment.video.id}`);
             attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
           }
         }
