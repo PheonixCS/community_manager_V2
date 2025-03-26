@@ -22,6 +22,7 @@ class MediaDownloadService {
       }
       
       const sizes = [...photo.sizes].sort((a, b) => (b.width * b.height) - (a.width * a.height));
+      console.log('Photo sizes:', sizes);
       const largestPhoto = sizes[-1];
       const photoUrl = largestPhoto.url;
       
