@@ -2,7 +2,7 @@ const axios = require('axios');
 const VkUserToken = require('../models/VkUserToken');
 const Settings = require('../models/Settings');
 const config = require('../config/config');
-const VkToken = require('../models/VkToken');
+const VkToken = require('../models/VkUserToken');
 
 /**
  * Сервис для авторизации в ВК и управления токенами
