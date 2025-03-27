@@ -59,6 +59,12 @@ class HoroscopeImageGenerator {
     this.ensureResourcesExist(resourcesPath);
     
     this.imgPath = path.join(resourcesPath, 'main.png');
+    this.iconPaths = [
+      path.join(resourcesPath, '1.png'),
+      path.join(resourcesPath, '2.png'),
+      path.join(resourcesPath, '3.png'),
+      path.join(resourcesPath, '4.png')
+    ];
     this.headerFont = path.join(resourcesPath, 'fonts/bebas_neue_ru.ttf');
     this.baseHeaderFontSize = 80;
     
@@ -147,8 +153,8 @@ class HoroscopeImageGenerator {
       const fontSize = this.calculateTextSize(ctx, text);
       this.drawTextToCenter(ctx, text, fontSize);
       
-      // Create footer icons
-      const icons = this.createFooterIcons();
+      // Create footer icons - changed from synchronous to async
+      const icons = await this.createFooterIcons();
       this.drawFooter(ctx, canvas.width, icons);
       
       // Convert to buffer and return
@@ -299,27 +305,75 @@ class HoroscopeImageGenerator {
     });
   }
 
-  createFooterIcons() {
-    // In a real implementation, this would load actual icons
-    // Here we'll just create rating values
-    const icons = [];
-    for (let i = 1; i <= 4; i++) {
-      icons.push({ value: String(Math.floor(Math.random() * 5) + 5) }); // Random value between 5-9
+  async createFooterIcons() {
+    try {
+      const icons = [];
+      // Try to load each icon image and add its rating value
+      for (let i = 0; i < 4; i++) {
+        try {
+          const iconPath = this.iconPaths[i];
+          
+          // Check if icon file exists
+          if (fs.existsSync(iconPath)) {
+            const iconImage = await loadImage(iconPath);
+            icons.push({
+              image: iconImage,
+              value: String(Math.floor(Math.random() * 5) + 5) // Random value between 5-9
+            });
+          } else {
+            console.warn(`Icon image not found at: ${iconPath}`);
+            // If icon image doesn't exist, just add the value
+            icons.push({
+              image: null,
+              value: String(Math.floor(Math.random() * 5) + 5)
+            });
+          }
+        } catch (error) {
+          console.error(`Error loading icon ${i+1}:`, error);
+          // If loading fails, just add the value
+          icons.push({
+            image: null,
+            value: String(Math.floor(Math.random() * 5) + 5)
+          });
+        }
+      }
+      return icons;
+    } catch (error) {
+      console.error('Error creating footer icons:', error);
+      // In case of error, return fallback icons (just values)
+      return Array(4).fill(0).map(() => ({
+        image: null,
+        value: String(Math.floor(Math.random() * 5) + 5)
+      }));
     }
-    return icons;
   }
 
   drawFooter(ctx, width, icons) {
     const iconSpacing = width / 5;
     const iconY = 1000; // Position from top
+    const iconSize = 60; // Size for the icon images
     
     ctx.font = `${this.baseFontRateSize}px Roboto`;
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     
-    // Draw values with even spacing
+    // Draw each icon with its value
     icons.forEach((icon, index) => {
       const x = iconSpacing * (index + 1);
+      
+      // If we have a loaded image, draw it above the text
+      if (icon.image) {
+        // Center the icon horizontally, position it above the text
+        ctx.drawImage(
+          icon.image, 
+          x - iconSize/2, 
+          iconY - iconSize - 10, 
+          iconSize, 
+          iconSize
+        );
+      }
+      
+      // Draw the value below the icon
       ctx.fillText(icon.value, x, iconY);
     });
   }
