@@ -347,7 +347,7 @@ class VkPostingService {
       // 5. Если опция pinned установлена, закрепляем пост
       if (options.pinned) {
         try {
-          await this.pinPost(result.post_id, communityId, token);
+          await this.pinPost(result.post_id, ownerId, token);
         } catch (pinError) {
           console.error(`Error pinning post ${result.post_id}:`, pinError);
           // Не прерываем процесс, если закрепление не удалось
