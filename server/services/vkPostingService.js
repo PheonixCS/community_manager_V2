@@ -341,8 +341,51 @@ class VkPostingService {
         ...this.preparePublishOptions(options)
       };
       
-      // 4. Публикуем пост через VK API
-      const result = await this.makeWallPostRequest(postData, token);
+      // 4. Публикуем пост через VK API с повторными попытками и обновлением токена
+      let result;
+      let retryCount = 0;
+      const maxRetries = 3;
+      const retryDelay = 1000; // 1 секунда между попытками
+
+      while (retryCount <= maxRetries) {
+        try {
+          // Если это повторная попытка, получаем свежий токен из базы
+          if (retryCount > 0) {
+            console.log(`Attempt ${retryCount}/${maxRetries}: Getting fresh token from database`);
+            
+            // Получаем свежий токен через vkAuthService
+            const vkAuthService = require('./vkAuthService');
+            const tokens = await vkAuthService.getAllTokens();
+            const activeTokens = tokens.filter(t => t.isActive && !t.isExpired());
+            
+            if (activeTokens.length === 0) {
+              throw new Error('No active tokens available after refresh');
+            }
+            
+            token = activeTokens[0].accessToken;
+            console.log(`Using fresh token for retry attempt ${retryCount}`);
+          }
+          
+          // Пытаемся опубликовать пост
+          result = await this.makeWallPostRequest(postData, token);
+          
+          // Если успешно, прерываем цикл попыток
+          break;
+        } catch (error) {
+          console.error(`Error publishing post (attempt ${retryCount + 1}/${maxRetries}):`, error);
+          
+          retryCount++;
+          
+          // Если исчерпали все попытки, выбрасываем ошибку
+          if (retryCount > maxRetries) {
+            throw new Error(`Failed to publish post after ${maxRetries} attempts: ${error.message}`);
+          }
+          
+          // Ждем перед следующей попыткой
+          console.log(`Waiting ${retryDelay}ms before next attempt...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
       
       // 5. Если опция pinned установлена, закрепляем пост
       if (options.pinned) {

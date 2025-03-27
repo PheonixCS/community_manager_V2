@@ -479,9 +479,9 @@ class VkAuthService {
       }
       
       // Если токен истек, но есть refresh token - обновляем перед активацией
-      // if (token.isExpired() && token.refreshToken) {
+      if (token.isExpired() && token.refreshToken) {
         await this.refreshToken(token.deviceId, token.refreshToken, token.vkUserId);
-      // }
+      }
       
       // token.isActive = true;
       // await token.save();

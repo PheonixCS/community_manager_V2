@@ -69,7 +69,15 @@ const VkUserTokenSchema = new Schema({
 // Метод для проверки, истек ли токен
 VkUserTokenSchema.methods.isExpired = function() {
   if (!this.expiresAt) return false;
-  return Math.floor(Date.now() / 1000) >= this.expiresAt;
+  
+  // Текущее время в секундах
+  const now = Math.floor(Date.now() / 1000);
+  
+  // 30 минут в секундах
+  const thirtyMinutes = 30 * 60;
+  
+  // Проверяем, истекает ли токен в течение 30 минут или уже истек
+  return (this.expiresAt - now) < thirtyMinutes;
 };
 
 // Статичный метод для поиска активного токена с нужными разрешениями (исправлен)
