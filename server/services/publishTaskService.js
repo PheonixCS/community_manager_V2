@@ -454,19 +454,14 @@ class PublishTaskService {
         throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
       }
       
-      // Выбираем первый активный токен с необходимыми правами
-      let token = null;
-      for (const t of activeTokens) {
-        if (t.scope && 
-          ((Array.isArray(t.scope) && t.scope.includes('wall')) || 
-            (typeof t.scope === 'string' && t.scope.includes('wall')))) {
-          token = t;
-          break;
-        }
-      }
       
-      if (!token) {
-        throw new Error('Нет токенов с необходимыми правами доступа (wall+photos)');
+      // Выбираем первый активный токен без проверки прав
+      let token = null;
+      if (activeTokens.length > 0) {
+        token = activeTokens[0];
+        console.log(`Selected first active token for user ${token.vkUserId}`);
+      } else {
+        throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
       }
       
       console.log(`Using token for user ${token.vkUserId} for content publishing`);
