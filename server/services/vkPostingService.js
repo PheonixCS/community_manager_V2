@@ -350,7 +350,7 @@ class VkPostingService {
       
       // Публикуем пост с текстом и загруженными вложениями
       const attachmentsString = result.attachments.join(',');
-      
+      console.log(content);
       // Формируем данные для запроса
       const postData = {
         owner_id: ownerId,
