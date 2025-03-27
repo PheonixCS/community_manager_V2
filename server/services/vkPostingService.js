@@ -291,10 +291,10 @@ class VkPostingService {
         ownerId: ownerId,
         attachments: []
       };
-      
+      const token = options.token.accessToken;
       // Список ключей S3 для последующей очистки
       const s3KeysToClean = [];
-      console.log(options.token);
+      
       // Загружаем фотографии, если они есть и формируем строку вложений
       if (content.attachments && content.attachments.length > 0) {
         const photoAttachments = content.attachments.filter(a => a.type === 'photo');
@@ -346,12 +346,12 @@ class VkPostingService {
       };
       
       // 4. Публикуем пост через VK API
-      result = await this.makeWallPostRequest(postData, options.token);
+      result = await this.makeWallPostRequest(postData, token);
       
       // 5. Если опция pinned установлена, закрепляем пост
       if (options.pinned) {
         try {
-          await this.pinPost(result.post_id, communityId, options.token);
+          await this.pinPost(result.post_id, communityId, token);
         } catch (pinError) {
           console.error(`Error pinning post ${result.post_id}:`, pinError);
           // Не прерываем процесс, если закрепление не удалось
