@@ -7,6 +7,7 @@ const config = require('./config/config');
 const schedulerService = require('./services/schedulerService');
 const s3Service = require('./services/s3Service');
 const tokenRefreshService = require('./services/tokenRefreshService');
+const cleanupService = require('./services/cleanupService');
 
 // Создаём все необходимые директории при запуске
 const downloadDir = path.resolve(__dirname, 'downloads');
@@ -73,6 +74,9 @@ app.use('/api/publish-tasks', require('./routes/api/publishTasks'));
 const mediaRoutes = require('./routes/mediaRoutes');
 app.use('/api/media', mediaRoutes);
 
+// Add the cleanup routes
+app.use('/api/cleanup', require('./routes/api/cleanup'));
+
 // Обслуживание статических файлов React в production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));
@@ -96,6 +100,11 @@ mongoose.connect(config.mongoURI, {
 })
   .then(() => {
     console.log('MongoDB connected');
+    
+    // Initialize services that require database connection
+    cleanupService.init().catch(err => {
+      console.error('Error initializing cleanup service:', err);
+    });
     
     // Запуск планировщиков
     schedulerService.init();

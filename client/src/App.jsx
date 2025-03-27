@@ -21,6 +21,9 @@ import ManualPublishing from './components/posting/ManualPublishing';
 import VkAuthManager from './components/posting/VkAuthManager';
 import ContentGeneratorManager from './components/posting/ContentGeneratorManager';
 
+// Import the cleanup settings component
+import CleanupSettings from './components/cleanup/CleanupSettings';
+
 // Импортируем темный режим
 import { ThemeProvider } from './theme/ThemeContext';
 import { useTheme } from './theme/ThemeContext';
@@ -56,6 +59,9 @@ const ThemedApp = () => {
               <Route path="/posting/manual" element={<ManualPublishing />} />
               <Route path="/posting/auth" element={<VkAuthManager />} />
               <Route path="/posting/generators" element={<ContentGeneratorManager />} />
+
+              {/* Add the route for cleanup settings */}
+              <Route path="/cleanup" element={<CleanupSettings />} />
             </Routes>
           </Box>
         </AppLayout>
