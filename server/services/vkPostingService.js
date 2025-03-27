@@ -399,7 +399,8 @@ class VkPostingService {
       if (result.attachments.length > 0) {
         postData.attachments = attachmentsString;
       }
-      
+      console.log(`full content:`);
+      console.log(content);
       // Включаем режим карусели, если это указано в content или если несколько фото
       if ((content.isCarousel || result.attachments.length > 1) && result.attachments.length > 0) {
         postData.primary_attachments_mode = 'carousel';
