@@ -576,7 +576,7 @@ const VkAuthManager = () => {
                               <IconButton
                                 size="small"
                                 color={token.isActive ? "warning" : "success"}
-                                onClick={() => handleToggleTokenActive(token.id, token.isActive)}
+                                onClick={() => handleToggleTokenActive(token._id, token.isActive)}
                                 disabled={tokenActions[token.id] === 'loading'}
                               >
                                 {tokenActions[token.id] === 'loading' ? (
