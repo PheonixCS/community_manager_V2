@@ -224,37 +224,6 @@ class PublishTaskService {
         return;
       }
       
-      // Check if token has proper permissions
-      // const hasProperToken = activeTokens.some(t => 
-      //   t.scope && t.scope.includes('wall')
-      // );
-      const hasProperToken = true;
-      // if (!hasProperToken) {
-      //   const errorMessage = 'Отсутствуют необходимые права для публикации (wall+manage). Удалите токен и авторизуйтесь заново.';
-      //   console.error(errorMessage);
-        
-      //   // Save error in history
-      //   for (const targetGroup of task.targetGroups) {
-      //     try {
-      //       await publishTaskRepository.savePublishHistory({
-      //         sourcePostId: bestPosts[0]?.postId || 'unknown',
-      //         postId: bestPosts[0]?._id || null,
-      //         sourceGroupId: bestPosts[0]?.communityId || 'unknown',
-      //         targetGroupId: targetGroup.groupId,
-      //         publishedAt: new Date(),
-      //         publishTaskId: task._id,
-      //         status: 'failed',
-      //         targetPostId: 'insufficient_permissions',
-      //         errorMessage: errorMessage
-      //       });
-      //     } catch (histErr) {
-      //       console.error('Failed to save error history:', histErr);
-      //     }
-      //   }
-        
-      //   result.failed += task.targetGroups.length;
-      //   return;
-      // }
       // Для каждой целевой группы публикуем лучшие посты
       for (const targetGroup of task.targetGroups) {
         for (const post of bestPosts) {
@@ -442,18 +411,7 @@ class PublishTaskService {
    */
   async executeGeneratorTask(task, result) {
     try {
-      console.log('Executing generator task with settings:', JSON.stringify(task.contentGeneratorSettings, null, 2));
-      
-      // Ensure carouselMode is properly set in params if imageType is image
-      if (task.contentGeneratorSettings.params.imageType === 'image') {
-        // Set default to true if not explicitly set to false
-        const carouselMode = task.contentGeneratorSettings.params.carouselMode !== false;
-        task.contentGeneratorSettings.params.carouselMode = carouselMode;
-        console.log(`Using carouselMode=${carouselMode} for content generation`);
-      }
-      
-      // Генерируем контент - используем сервис напрямую
-      const contentGeneratorService = require('./contentGeneratorService');
+
       const generatedContent = await contentGeneratorService.generateContent(
         task.contentGeneratorSettings.generatorId,
         task.contentGeneratorSettings.params
@@ -463,44 +421,16 @@ class PublishTaskService {
         throw new Error('Failed to generate content');
       }
       
-      // Explicitly handle carousel mode from parameters
-      if (task.contentGeneratorSettings.params.imageType === 'image' && 
-          'carouselMode' in task.contentGeneratorSettings.params) {
-        generatedContent.isCarousel = task.contentGeneratorSettings.params.carouselMode && 
-          generatedContent.attachments && 
-          generatedContent.attachments.length > 1;
-        console.log(`Set isCarousel to ${generatedContent.isCarousel} for generated content`);
-      }
       
       // Получаем токен доступа для публикации
       const vkAuthService = require('./vkAuthService');
       const tokens = await vkAuthService.getAllTokens();
       const activeTokens = tokens.filter(t => t.isActive && !t.isExpired());
+      const activeToken = activeTokens[0];
+      if (!activeToken) {
+        throw new Error('No active tokens available for publishing');
+      } 
       
-      if (activeTokens.length === 0) {
-        throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
-      }
-      
-    
-      // Выбираем первый активный токен без проверки прав
-      let token = null;
-      if (activeTokens.length > 0) {
-        token = activeTokens[0];
-        console.log(`Selected first active token for user ${token.vkUserId}`);
-        
-        // Логируем права токена для информации, но не фильтруем по ним
-        if (token.scope) {
-          const scopeStr = Array.isArray(token.scope) ? token.scope.join(', ') : token.scope;
-          console.log(`Token has the following scopes: ${scopeStr}`);
-        } else {
-          console.log('Token does not have explicit scope information');
-        }
-      } else {
-        throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
-      }
-      
-      console.log(`Using token for user ${token.vkUserId} for content publishing`);
-  
       // Публикуем сгенерированный контент в каждую целевую группу
       for (const targetGroup of task.targetGroups) {
         try {
@@ -508,10 +438,11 @@ class PublishTaskService {
             generatedContent,
             targetGroup.groupId,
             {
+              ...task.contentGeneratorSettings.params,
               ...task.publishOptions,
               saveToDatabase: true,
               taskId: task._id,
-              token: token
+              token: activeToken
             }
           );
           

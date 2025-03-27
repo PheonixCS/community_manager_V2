@@ -285,24 +285,6 @@ class VkPostingService {
   async publishGeneratedPost(content, ownerId, options = {}) {
     try {
       console.log(`Publishing generated content to ${ownerId}`);
-      
-      // Получаем токен из опций или через стандартный метод
-      
-      // 1. Получаем токен публикации
-      const token = await this.getPublishToken();
-      if (!token) {
-        throw new Error('Failed to get publish token. Authorize VK user first.');
-      }
-      // console.log(token);
-      // return;
-      
-      
-      // Проверяем наличие текста или вложений
-      if ((!content.text || content.text.trim() === '') && 
-          (!content.attachments || content.attachments.length === 0)) {
-        throw new Error('No content to publish (text or attachments)');
-      }
-      
       // Инициализируем результат
       const result = {
         status: 'pending',
@@ -313,7 +295,7 @@ class VkPostingService {
       // Список ключей S3 для последующей очистки
       const s3KeysToClean = [];
       
-      // Загружаем фотографии, если они есть
+      // Загружаем фотографии, если они есть и формируем строку вложений
       if (content.attachments && content.attachments.length > 0) {
         const photoAttachments = content.attachments.filter(a => a.type === 'photo');
         
@@ -350,25 +332,26 @@ class VkPostingService {
       
       // Публикуем пост с текстом и загруженными вложениями
       const attachmentsString = result.attachments.join(',');
-      console.log(content);
+
       // Формируем данные для запроса
       const postData = {
         owner_id: ownerId,
         message: content.text || '',
         attachments: attachmentsString ? attachmentsString : "",
-        // from_group: options.fromGroup !== false ? 1 : 0,
-        // close_comments: options.closeComments ? 1 : 0,
-        // mark_as_ads: options.markedAsAds ? 1 : 0
-        _isCarousel: content.carouselMode
+        from_group: options.fromGroup !== false ? 1 : 0,
+        mark_as_ads: options.markedAsAds ? 1 : 0,
+        _isCarousel: options.carouselMode,
+        _photosCount: content.attachments ? content.attachments.filter(a => a.type === 'photo').length : 0,
+        ...this.preparePublishOptions(options)
       };
       
       // 4. Публикуем пост через VK API
-      result = await this.makeWallPostRequest(postData, token);
+      result = await this.makeWallPostRequest(postData, options.token);
       
       // 5. Если опция pinned установлена, закрепляем пост
       if (options.pinned) {
         try {
-          await this.pinPost(result.post_id, communityId, token);
+          await this.pinPost(result.post_id, communityId, options.token);
         } catch (pinError) {
           console.error(`Error pinning post ${result.post_id}:`, pinError);
           // Не прерываем процесс, если закрепление не удалось
@@ -380,16 +363,6 @@ class VkPostingService {
       result.status = 'success';
       result.postId = result.post_id;
       result.vkUrl = `https://vk.com/wall${ownerId}_${result.post_id}`;
-      
-      // Если нужно закрепить пост
-      // if (options.pinned) {
-      //   try {
-      //     await this.pinPost(response.data.response.post_id, ownerId, token);
-      //   } catch (pinError) {
-      //     console.error(`Error pinning post ${response.data.response.post_id}:`, pinError);
-      //     // Не прерываем процесс, если закрепление не удалось
-      //   }
-      // }
       
       // Сохраняем в базу данных, если это указано в опциях
       if (options.saveToDatabase) {
@@ -887,6 +860,10 @@ class VkPostingService {
       formData.append('access_token', token);
       formData.append('v', '5.131');
       formData.append('from_group', '1');
+
+      if(postData.mark_as_ads) {
+        formData.append('mark_as_ads', '1');
+      }
       
       // Определяем, нужно ли использовать режим карусели
       // Используем carousel_mode, если:
