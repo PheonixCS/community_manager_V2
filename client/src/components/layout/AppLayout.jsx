@@ -240,17 +240,6 @@ const AppLayout = ({ children }) => {
                 </ListItemIcon>
                 <ListItemText primary="Шаблоны фильтров" />
               </ListItem>
-              <ListItem 
-                button 
-                component={Link} 
-                to="/cleanup"
-                selected={isActive('/cleanup')}
-              >
-                <ListItemIcon>
-                  <DashboardIcon />
-                </ListItemIcon>
-                <ListItemText primary="Очистка" />
-              </ListItem>
             </List>
           </>
         ) : (
@@ -361,6 +350,17 @@ const AppLayout = ({ children }) => {
               <SettingsIcon />
             </ListItemIcon>
             <ListItemText primary="Настройки" />
+          </ListItem>
+          <ListItem 
+            button 
+            component={Link} 
+            to="/cleanup"
+            selected={isActive('/cleanup')}
+          >
+            <ListItemIcon>
+              <SettingsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Очистка" />
           </ListItem>
         </List>
       </StyledDrawer>
