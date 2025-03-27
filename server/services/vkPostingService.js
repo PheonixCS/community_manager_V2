@@ -394,12 +394,12 @@ class VkPostingService {
       // }
       
       // 4. Публикуем пост через VK API
-      result = await this.makeWallPostRequest(postData, token);
+      result = await this.makeWallPostRequest(postData, tokenString);
       
       // 5. Если опция pinned установлена, закрепляем пост
       if (options.pinned) {
         try {
-          await this.pinPost(result.post_id, communityId, token);
+          await this.pinPost(result.post_id, communityId, tokenString);
         } catch (pinError) {
           console.error(`Error pinning post ${result.post_id}:`, pinError);
           // Не прерываем процесс, если закрепление не удалось
