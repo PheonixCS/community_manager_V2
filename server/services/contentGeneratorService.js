@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const logger = require('../utils/logger');
+
 
 /**
  * Service for managing and executing content generators
@@ -17,7 +17,7 @@ class ContentGeneratorService {
    * Initialize the service and load all generators
    */
   initialize() {
-    logger.info('Initializing ContentGeneratorService');
+    // logger.info('Initializing ContentGeneratorService');
     this.loadGenerators();
     this.isInitialized = true;
     return Promise.resolve();
@@ -33,7 +33,7 @@ class ContentGeneratorService {
 
       // Check if generators directory exists
       if (!fs.existsSync(this.generatorsDir)) {
-        logger.warn(`Generators directory not found: ${this.generatorsDir}`);
+        // logger.warn(`Generators directory not found: ${this.generatorsDir}`);
         return;
       }
 
@@ -53,9 +53,9 @@ class ContentGeneratorService {
             
             if (Array.isArray(registeredGenerators)) {
               this.generators = [...registeredGenerators];
-              logger.info(`Loaded ${this.generators.length} generators from registry`);
+              // logger.info(`Loaded ${this.generators.length} generators from registry`);
             } else {
-              logger.warn('Generator registry did not return an array');
+              // logger.warn('Generator registry did not return an array');
             }
             
             // If registry is exclusive, return early
@@ -64,7 +64,7 @@ class ContentGeneratorService {
             }
           }
         } catch (registryError) {
-          logger.error('Error loading generator registry:', registryError);
+          // logger.error('Error loading generator registry:', registryError);
         }
       }
 
@@ -90,11 +90,11 @@ class ContentGeneratorService {
               if (existingIndex >= 0) {
                 // Replace existing generator
                 this.generators[existingIndex] = generatorModule;
-                logger.info(`Updated generator: ${generatorModule.id}`);
+                // logger.info(`Updated generator: ${generatorModule.id}`);
               } else {
                 // Add new generator
                 this.generators.push(generatorModule);
-                logger.info(`Loaded generator: ${generatorModule.id}`);
+                // logger.info(`Loaded generator: ${generatorModule.id}`);
               }
             } 
             // Handle wrapped generators (checks for map function from wrapped export)
@@ -106,10 +106,10 @@ class ContentGeneratorService {
                 
                 if (existingIndex >= 0) {
                   this.generators[existingIndex] = wrappedGen;
-                  logger.info(`Updated wrapped generator: ${wrappedGen.id}`);
+                  // logger.info(`Updated wrapped generator: ${wrappedGen.id}`);
                 } else {
                   this.generators.push(wrappedGen);
-                  logger.info(`Loaded wrapped generator: ${wrappedGen.id}`);
+                  // logger.info(`Loaded wrapped generator: ${wrappedGen.id}`);
                 }
               }
             }
@@ -125,27 +125,27 @@ class ContentGeneratorService {
                       
                       if (existingIndex >= 0) {
                         this.generators[existingIndex] = gen;
-                        logger.info(`Updated generator: ${gen.id}`);
+                        // logger.info(`Updated generator: ${gen.id}`);
                       } else {
                         this.generators.push(gen);
-                        logger.info(`Loaded generator: ${gen.id}`);
+                        // logger.info(`Loaded generator: ${gen.id}`);
                       }
                     }
                   }
                 }
               } catch (error) {
-                logger.error(`Error calling getGenerators for ${file}:`, error);
+                // logger.error(`Error calling getGenerators for ${file}:`, error);
               }
             }
           } catch (error) {
-            logger.error(`Error loading generator from ${file}:`, error);
+            // logger.error(`Error loading generator from ${file}:`, error);
           }
         }
       }
 
-      logger.info(`Total loaded generators: ${this.generators.length}`);
+      // logger.info(`Total loaded generators: ${this.generators.length}`);
     } catch (error) {
-      logger.error('Error loading generators:', error);
+      // logger.error('Error loading generators:', error);
     }
   }
 
