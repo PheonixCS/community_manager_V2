@@ -286,11 +286,7 @@ class VkPostingService {
     try {
       console.log(`Publishing generated content to ${ownerId}`);
       // Инициализируем результат
-      const result = {
-        status: 'pending',
-        ownerId: ownerId,
-        attachments: []
-      };
+      const generatedAttachments = [];
       const token = options.token.accessToken;
       // Список ключей S3 для последующей очистки
       const s3KeysToClean = [];
@@ -318,7 +314,7 @@ class VkPostingService {
                 const photoResult = await this.uploadPhotoToVkWithRetry(publicUrl, token, ownerId);
                 
                 if (photoResult) {
-                  result.attachments.push(photoResult);
+                  generatedAttachments.push(photoResult);
                   console.log(`Successfully uploaded photo: ${photoResult}`);
                 }
               } catch (uploadError) {
@@ -331,7 +327,7 @@ class VkPostingService {
       }
       
       // Публикуем пост с текстом и загруженными вложениями
-      const attachmentsString = result.attachments.join(',');
+      const attachmentsString = generatedAttachments.join(',');
 
       // Формируем данные для запроса
       const postData = {
@@ -346,7 +342,7 @@ class VkPostingService {
       };
       
       // 4. Публикуем пост через VK API
-      result = await this.makeWallPostRequest(postData, token);
+      const result = await this.makeWallPostRequest(postData, token);
       
       // 5. Если опция pinned установлена, закрепляем пост
       if (options.pinned) {
