@@ -288,27 +288,38 @@ class VkPostingService {
       
       // Получаем токен из опций или через стандартный метод
       let tokenString;
+      // 1. Приоритетное использование токена из опций
       if (options.token) {
-        // Если передали токен в опциях напрямую
-        tokenString = options.token;
-        console.log("Using token from options");
-      } else {
+        if (typeof options.token === 'string') {
+          tokenString = options.token;
+        } else if (options.token.accessToken) {
+          tokenString = options.token.accessToken;
+        } else {
+          console.warn("Token object provided without accessToken property");
+        }
+        
+        if (tokenString) {
+          console.log("Using token from options");
+        }
+      }
+      
+      // 2. Если токен не передан в опциях, получаем его из сервиса авторизации
+      if (!tokenString) {
         try {
-          // Получение токена через vkAuthService
-          const tokenObj = await vkAuthService.getActiveToken(['wall', 'photos', 'groups', 'manage']);
+          // Получаем первый активный токен без проверки прав
+          const vkAuthService = require('./vkAuthService');
+          const tokens = await vkAuthService.getAllTokens();
+          const activeTokens = tokens.filter(t => t.isActive && !t.isExpired());
           
-          if (!tokenObj) {
-            throw new Error('No active token with required permissions found');
+          if (activeTokens.length > 0) {
+            tokenString = activeTokens[0].accessToken;
+            console.log(`Using first active token from vkAuthService for user ${activeTokens[0].vkUserId}`);
+          } else {
+            throw new Error('No active tokens available');
           }
-          
-          tokenString = tokenObj.accessToken;
-          console.log(`Using token from vkAuthService for user ${tokenObj.vkUserId}`);
         } catch (tokenError) {
           console.error('Error getting token from vkAuthService:', tokenError);
-          
-          // Запасной вариант через наш метод getPublishToken
-          tokenString = await this.getPublishToken();
-          console.log("Using token from getPublishToken method as fallback");
+          throw new Error('Failed to obtain VK token: ' + tokenError.message);
         }
       }
       
