@@ -385,9 +385,10 @@ class VkPostingService {
       const postData = {
         owner_id: ownerId,
         message: content.text || '',
-        from_group: options.fromGroup !== false ? 1 : 0,
-        close_comments: options.closeComments ? 1 : 0,
-        mark_as_ads: options.markedAsAds ? 1 : 0
+        // from_group: options.fromGroup !== false ? 1 : 0,
+        // close_comments: options.closeComments ? 1 : 0,
+        // mark_as_ads: options.markedAsAds ? 1 : 0
+        _isCarousel: content.isCarousel
       };
       
       // Добавляем отложенную публикацию, если указана
@@ -399,66 +400,64 @@ class VkPostingService {
       if (result.attachments.length > 0) {
         postData.attachments = attachmentsString;
       }
-      console.log(`full content:`);
-      console.log(content);
+      // console.log(`full content:`);
+      // console.log(content);
       // Включаем режим карусели, если это указано в content или если несколько фото
-      if ((content.isCarousel || result.attachments.length > 1) && result.attachments.length > 0) {
-        postData.primary_attachments_mode = 'carousel';
-        console.log('Using carousel mode for attachments');
-      }
+      // if ((content.isCarousel || result.attachments.length > 1) && result.attachments.length > 0) {
+      //   postData.primary_attachments_mode = 'carousel';
+      //   console.log('Using carousel mode for attachments');
+      // }
       
-      console.log(`Attempting wall.post request with data:`, {
-        owner_id: postData.owner_id,
-        message_preview: postData.message ? `${postData.message.substring(0, 20)}...` : '(no text)',
-        has_attachments: result.attachments.length > 0,
-        attachment_count: result.attachments.length
-      });
+      // console.log(`Attempting wall.post request with data:`, {
+      //   owner_id: postData.owner_id,
+      //   message_preview: postData.message ? `${postData.message.substring(0, 20)}...` : '(no text)',
+      //   has_attachments: result.attachments.length > 0,
+      //   attachment_count: result.attachments.length
+      // });
       
       // Отправляем запрос на публикацию поста
-      const formData = new URLSearchParams();
+      // const formData = new URLSearchParams();
       
-      // Добавляем все параметры в form data
-      for (const [key, value] of Object.entries(postData)) {
-        formData.append(key, value);
-      }
+      // // Добавляем все параметры в form data
+      // for (const [key, value] of Object.entries(postData)) {
+      //   formData.append(key, value);
+      // }
       
-      // Добавляем токен и версию API
-      formData.append('access_token', tokenString);
-      formData.append('v', vkApiVersion);
+      // 4. Публикуем пост через VK API
+      result = await this.makeWallPostRequest(postData, token);
       
-      // Выполняем запрос
-      const response = await axios.post('https://api.vk.com/method/wall.post', formData, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-      
-      if (response.data.error) {
-        throw new Error(`VK API error: ${response.data.error.error_msg}`);
-      }
-      
-      // Успешная публикация
-      console.log(`Successfully posted to wall, post ID: ${response.data.response.post_id}`);
-      result.status = 'success';
-      result.postId = response.data.response.post_id;
-      result.vkUrl = `https://vk.com/wall${ownerId}_${response.data.response.post_id}`;
-      
-      // Если нужно закрепить пост
+      // 5. Если опция pinned установлена, закрепляем пост
       if (options.pinned) {
         try {
-          await this.pinPost(response.data.response.post_id, ownerId, tokenString);
+          await this.pinPost(result.post_id, communityId, token);
         } catch (pinError) {
-          console.error(`Error pinning post ${response.data.response.post_id}:`, pinError);
+          console.error(`Error pinning post ${result.post_id}:`, pinError);
           // Не прерываем процесс, если закрепление не удалось
         }
       }
+      
+      // Успешная публикация
+      console.log(`Successfully posted to wall, post ID: ${result.post_id}`);
+      result.status = 'success';
+      result.postId = result.post_id;
+      result.vkUrl = `https://vk.com/wall${ownerId}_${result.post_id}`;
+      
+      // Если нужно закрепить пост
+      // if (options.pinned) {
+      //   try {
+      //     await this.pinPost(response.data.response.post_id, ownerId, tokenString);
+      //   } catch (pinError) {
+      //     console.error(`Error pinning post ${response.data.response.post_id}:`, pinError);
+      //     // Не прерываем процесс, если закрепление не удалось
+      //   }
+      // }
       
       // Сохраняем в базу данных, если это указано в опциях
       if (options.saveToDatabase) {
         try {
           const savedPost = await this.saveGeneratedPostToDatabase(
             content, 
-            response.data.response, 
+            result, 
             ownerId,
             options.taskId
           );
