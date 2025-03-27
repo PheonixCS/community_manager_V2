@@ -428,6 +428,17 @@ class PublishTaskService {
       const activeTokens = tokens.filter(t => t.isActive && !t.isExpired());
       const activeToken = activeTokens[0];
       if (!activeToken) {
+        await publishTaskRepository.savePublishHistory({
+          sourcePostId: 'no_posts',
+          postId: null,
+          sourceGroupId: 'n/a',
+          targetGroupId: task.targetGroups.length > 0 ? task.targetGroups[0].groupId : 'no_target',
+          publishedAt: new Date(),
+          publishTaskId: task._id,
+          status: 'failed',
+          targetPostId: 'no_tokens',
+          errorMessage: 'Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".'
+        });
         throw new Error('No active tokens available for publishing');
       } 
       
@@ -449,17 +460,50 @@ class PublishTaskService {
           
           if (publishResult.status === 'success') {
             result.successful++;
+            await publishTaskRepository.savePublishHistory({
+              sourcePostId: 'no_posts',
+              postId: null,
+              sourceGroupId: 'n/a',
+              targetGroupId: targetGroup.groupId,
+              publishedAt: new Date(),
+              publishTaskId: task._id,
+              status: 'success',
+              targetPostId: publishResult.postId || 'unknown',
+              targetPostUrl: publishResult.vkUrl || ''
+            });
           } else {
             result.failed++;
           }
           
         } catch (error) {
+          await publishTaskRepository.savePublishHistory({
+            sourcePostId: 'no_posts',
+            postId: null,
+            sourceGroupId: 'n/a',
+            targetGroupId: targetGroup.groupId,
+            publishedAt: new Date(),
+            publishTaskId: task._id,
+            status: 'failed',
+            targetPostId: 'failed_publish',
+            errorMessage: error.message || 'Unknown error'
+          });
           console.error(`Error publishing generated content to group ${targetGroup.groupId}:`, error);
           result.failed++;
         }
       }
       
     } catch (error) {
+      await publishTaskRepository.savePublishHistory({
+        sourcePostId: 'no_posts',
+        postId: null,
+        sourceGroupId: 'n/a',
+        targetGroupId: task.targetGroups.length > 0 ? task.targetGroups[0].groupId : 'no_target',
+        publishedAt: new Date(),
+        publishTaskId: task._id,
+        status: 'failed',
+        targetPostId: 'failed_generator',
+        errorMessage: error.message || 'Failed to generate content'
+      });       
       console.error(`Error executing generator task ${task._id}:`, error);
       result.failed += task.targetGroups.length; // Считаем все попытки как неудачные
     }

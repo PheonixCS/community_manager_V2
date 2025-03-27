@@ -391,7 +391,12 @@ class VkPostingService {
         }
       }
       
-      return result;
+      return {
+        status: 'success',
+        postId: result.post_id,
+        message: `Post successfully published to VK community ${ownerId}`,
+        vkUrl: `https://vk.com/wall${ownerId}_${result.post_id}`
+      };
       
     } catch (error) {
       console.error('Error publishing generated content:', error);
