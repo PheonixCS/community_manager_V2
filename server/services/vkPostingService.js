@@ -1224,7 +1224,7 @@ class VkPostingService {
       const response = await axios.get('https://api.vk.com/method/wall.post', {
         params: {
           ...postData,
-          access_token: token.token,
+          access_token: token.accessToken,
           v: vkApiVersion
         }
       });
