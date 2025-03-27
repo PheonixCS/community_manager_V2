@@ -127,8 +127,13 @@ class PublishTaskService {
     
     // Если задача использует генератор контента
     if (task.useContentGenerator && task.contentGeneratorSettings?.generatorId) {
-      console.log(task);
-      return;
+      console.log('Task settings:', JSON.stringify(task.contentGeneratorSettings, null, 2));
+      // Подробный вывод параметров генерации для отладки
+      if (task.contentGeneratorSettings?.params) {
+        console.log('Generator params details:', task.contentGeneratorSettings.params);
+      }
+      
+      // Удаляем return, который блокирует выполнение
       await this.executeGeneratorTask(task, result);
     } else {
       // Задача публикации лучших постов из скрапинга

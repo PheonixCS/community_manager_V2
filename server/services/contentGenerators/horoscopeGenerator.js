@@ -168,7 +168,7 @@ class HoroscopeGenerator {
             sign,
             signName: ZODIAC_SIGNS[sign].ru,
             text: `Не удалось получить гороскоп для знака ${ZODIAC_SIGNS[sign].ru}.`,
-            fullText: `Не удалось получить гороскоп для знака ${ZODIАК_SIGNS[sign].ru}.`,
+            fullText: `Не удалось получить гороскоп для знака ${ZODIAC_SIGNS[sign].ru}.`, // Исправлена опечатка ZODIAK -> ZODIAC
             date: new Date(),
             imagePath: null
           };
