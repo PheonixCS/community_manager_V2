@@ -290,7 +290,7 @@ class VkPostingService {
       const token = options.token.accessToken;
       // Список ключей S3 для последующей очистки
       const s3KeysToClean = [];
-      
+      console.log(`Options for generated post:`, options);
       // Загружаем фотографии, если они есть и формируем строку вложений
       if (content.attachments && content.attachments.length > 0) {
         const photoAttachments = content.attachments.filter(a => a.type === 'photo');

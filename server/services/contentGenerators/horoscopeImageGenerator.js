@@ -363,17 +363,16 @@ class HoroscopeImageGenerator {
   }
 
   drawFooter(ctx, width, icons) {
-    // Improved positioning for footer elements
+    // Improved positioning for footer elements with values on the right side of icons
     const iconSpacing = width / 5;
     const iconY = 1080 - this.footerHeight / 2; // Center icons vertically in footer area
     const iconSize = 65;
-    const textOffsetY = 70; // Distance between icon and text
+    const textOffsetX = 15; // Horizontal space between icon and text
     
     ctx.font = `${this.baseFontRateSize}px Roboto`;
     ctx.fillStyle = 'white';
-    ctx.textAlign = 'center';
     
-    // Draw each icon with its value
+    // Draw each icon with its value to the right
     icons.forEach((icon, index) => {
       const x = iconSpacing * (index + 1);
       
@@ -383,14 +382,17 @@ class HoroscopeImageGenerator {
         ctx.drawImage(
           icon.image, 
           x - iconSize/2, 
-          iconY - textOffsetY, 
+          iconY - iconSize/2, 
           iconSize, 
           iconSize
         );
       }
       
-      // Draw the value below the icon with proper spacing
-      ctx.fillText(icon.value, x, iconY + 35);
+      // Set text alignment to left for placing text after icon
+      ctx.textAlign = 'left';
+      
+      // Draw the value to the right of the icon
+      ctx.fillText(icon.value, x + iconSize/2 + textOffsetX, iconY + iconSize/4);
     });
   }
 }
