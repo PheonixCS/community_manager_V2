@@ -356,7 +356,7 @@ class VkAuthService {
       formData.append('client_id', appId);
       formData.append('device_id', deviceId);
       formData.append('state', state);
-      
+      console.log(formData);
       // Делаем POST запрос на указанный endpoint
       const response = await axios.post('https://id.vk.com/oauth2/auth', formData, {
         headers: {
