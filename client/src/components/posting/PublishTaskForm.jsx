@@ -362,7 +362,8 @@ const PublishTaskForm = () => {
       if (generator && (!task.contentGeneratorSettings.params || Object.keys(task.contentGeneratorSettings.params).length === 0)) {
         const initialParams = {};
         generator.params.forEach(param => {
-          initialParams[param.name] = param.defaultValue;
+          // Fix: Use param.default instead of param.defaultValue which doesn't exist
+          initialParams[param.name] = param.default !== undefined ? param.default : null;
         });
         
         handleTaskChange('contentGeneratorSettings', {

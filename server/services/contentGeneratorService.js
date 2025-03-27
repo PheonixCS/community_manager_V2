@@ -83,6 +83,12 @@ class ContentGeneratorService {
       console.log(`Attempting to generate content with generator: ${generatorId}`);
       console.log('Generator params:', JSON.stringify(params, null, 2));
       
+      // Ensure carouselMode is set with proper default for image content
+      if (params.imageType === 'image') {
+        params.carouselMode = params.carouselMode !== false; // Default to true if not explicitly false
+        console.log(`Using carouselMode=${params.carouselMode} for content generation`);
+      }
+      
       // Reload generators to ensure we have the latest version
       if (this.generators.size === 0) {
         console.log('No generators loaded, attempting to load them now');

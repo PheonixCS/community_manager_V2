@@ -113,6 +113,12 @@ class HoroscopeGenerator {
     try {
       console.log('Generating horoscope content with params:', params);
       
+      // Ensure carouselMode has a default value if it's not explicitly provided
+      if (params.imageType === 'image' && params.carouselMode === undefined) {
+        params.carouselMode = true; // Default to true for carousel mode
+        console.log('Setting default carouselMode to true');
+      }
+      
       // Determine which signs to generate
       let signsToGenerate = [];
       if (params.signSelection === 'all') {

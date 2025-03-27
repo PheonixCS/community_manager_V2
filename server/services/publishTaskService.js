@@ -444,6 +444,14 @@ class PublishTaskService {
     try {
       console.log('Executing generator task with settings:', JSON.stringify(task.contentGeneratorSettings, null, 2));
       
+      // Ensure carouselMode is properly set in params if imageType is image
+      if (task.contentGeneratorSettings.params.imageType === 'image') {
+        // Set default to true if not explicitly set to false
+        const carouselMode = task.contentGeneratorSettings.params.carouselMode !== false;
+        task.contentGeneratorSettings.params.carouselMode = carouselMode;
+        console.log(`Using carouselMode=${carouselMode} for content generation`);
+      }
+      
       // Генерируем контент - используем сервис напрямую
       const contentGeneratorService = require('./contentGeneratorService');
       const generatedContent = await contentGeneratorService.generateContent(
