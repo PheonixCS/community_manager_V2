@@ -371,6 +371,8 @@ class VkAuthService {
       }
       token.isActive = true;
       token.accessToken = response.data.access_token;
+      token.expiresAt = response.data.expires_in ? Math.floor(Date.now() / 1000) + response.data.expires_in : null;
+      // token.refreshToken = response.data.refresh_token || null;
       return response.data;
 
     } catch (error) {
