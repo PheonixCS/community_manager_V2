@@ -293,8 +293,8 @@ class VkPostingService {
       if (!tokenString) {
         throw new Error('Failed to get publish token. Authorize VK user first.');
       }
-      console.log(tokenString);
-      return;
+      // console.log(tokenString);
+      // return;
       
       
       // Проверяем наличие текста или вложений
