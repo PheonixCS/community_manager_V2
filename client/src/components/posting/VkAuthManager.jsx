@@ -106,7 +106,7 @@ const VkAuthManager = () => {
   };
 
   const handleToggleTokenActive = async (tokenId, isActive, token) => {
-    console.log(token)
+    console.log(token);
     try {
       setTokenActions(prev => ({ ...prev, [tokenId]: 'loading' }));
       
