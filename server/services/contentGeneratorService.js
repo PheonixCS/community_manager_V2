@@ -176,7 +176,7 @@ class ContentGeneratorService {
       
       return await generator.generateContent(params);
     } catch (error) {
-      logger.error(`Error generating content with ${generatorId}:`, error);
+      // logger.error(`Error generating content with ${generatorId}:`, error);
       throw error;
     }
   }

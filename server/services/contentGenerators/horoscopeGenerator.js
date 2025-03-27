@@ -83,7 +83,7 @@ class HoroscopeGenerator {
         name: 'header',
         label: 'Текст заголовка',
         type: 'text',
-        default: '🔮 Гороскоп на завтра 🔮',
+        default: '',
         dependent: {
           param: 'addHeader',
           values: [true]
@@ -99,7 +99,9 @@ class HoroscopeGenerator {
         name: 'footer',
         label: 'Текст подписи',
         type: 'text',
-        default: '❤️ Подписывайтесь на наш паблик для ежедневных гороскопов!',
+        default: `Ставь ❤️ и пиши ВО БЛАГО для удачного дня!
+Напиши дату рождения в комментариях и
+получи личный гороскоп от астролога`,
         dependent: {
           param: 'addFooter',
           values: [true]
@@ -270,7 +272,34 @@ class HoroscopeGenerator {
         
         // Only include text if we're not using images or this specific horoscope doesn't have an image
         if (params.imageType !== 'image' || !horoscope.imageUrl) {
-          postText += `🔮 ${horoscope.signName} (${this.formatDate(horoscope.date)})\n${horoscope.fullText}\n\n`;
+          const monthNames = [
+            'ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ',
+            'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'
+          ];
+          // Получаем компоненты даты
+          const d = new Date(horoscope.date);
+          const day = d.getDate();
+          const month = monthNames[d.getMonth()];
+          // Получаем эмодзи знака зодиака
+          const zodiacEmojis = {
+            ARIES: '♈️',
+            TAURUS: '♉️',
+            GEMINI: '♊️',
+            CANCER: '♋️',
+            LEO: '♌️',
+            VIRGO: '♍️',
+            LIBRA: '♎️',
+            SCORPIO: '♏️',
+            SAGITTARIUS: '♐️',
+            CAPRICORN: '♑️',
+            AQUARIUS: '♒️',
+            PISCES: '♓️'
+          };
+          
+          const emoji = zodiacEmojis[horoscope.sign] || '';
+          
+          // Формируем текст в новом формате
+          postText += `ГОРОСКОП НА ${day} ${month} ${emoji}\n\n${horoscope.fullText}\n\n`;
         }
         
         // Add image attachment if any
