@@ -403,26 +403,16 @@ class VkAuthService {
   }
   
   /**
-   * Получение активного токена для нужных разрешений, с автоматическим обновлением
-   * @param {string|string[]} requiredScope - Необходимые разрешения
-   * @returns {Promise<Object|null>} Токен доступа или null, если нет подходящего токена
-   */
+   * Получение активного токена без фильтрации по разрешениям
+   * @param {string|string[]} requiredScope - Параметр сохранен для совместимости, но не используется
+   * @returns {Promise<Object|null>} Первый активный токен или null, если нет активных токенов
+  */
   async getActiveToken(requiredScope = []) {
     try {
-      const scopeArray = Array.isArray(requiredScope) ? requiredScope : [requiredScope];
+      // Логирование для отладки (можно опустить в production)
+      console.log(`Requesting active token (scope parameter ignored): ${Array.isArray(requiredScope) ? requiredScope.join(',') : requiredScope}`);
       
-      // Выводим для отладки, какие разрешения мы ищем
-      console.log(`Looking for token with scopes: ${scopeArray.join(',')}`);
-      
-      // Check specifically for critical permissions
-      const criticalPermissions = ['wall', 'photos', 'groups', 'video', 'offline', 'docs'];
-      const needsCriticalPermissions = scopeArray.some(scope => criticalPermissions.includes(scope));
-      
-      if (needsCriticalPermissions) {
-        console.log('This request needs critical posting permissions. Checking tokens carefully.');
-      }
-      
-      // Более гибкий поиск токена: находим активные токены
+      // Находим все активные неистекшие токены
       const activeTokens = await VkUserToken.find({ 
         isActive: true,
         expiresAt: { $gt: Math.floor(Date.now() / 1000) }
@@ -430,98 +420,32 @@ class VkAuthService {
       
       console.log(`Found ${activeTokens.length} active non-expired tokens`);
       
-      if (activeTokens.length === 0) {
-        return null;
-      }
-      
-      // For wall posting, we specifically need wall + manage permissions
-      if (scopeArray.includes('wall') && scopeArray.includes('manage')) {
-        // Find tokens that have both wall and manage permissions
-        const wallAndManageTokens = activeTokens.filter(token => {
-          return token.scope && 
-                 token.scope.includes('wall') && 
-                 token.scope.includes('manage');
-        });
-        
-        if (wallAndManageTokens.length > 0) {
-          console.log(`Found ${wallAndManageTokens.length} tokens with both wall and manage permissions`);
-          // Use the first valid token
-          const token = wallAndManageTokens[0];
-          token.lastUsed = new Date();
-          await token.save();
-          return token;
-        } else {
-          console.log('No tokens found with both wall and manage permissions - critical for posting to communities');
-        }
-      }
-      
-      // Проверяем наличие необходимых разрешений - более лояльно
-      // Ищем токен, у которого есть хотя бы одно из требуемых разрешений
-      let bestToken = null;
-      let bestScopeMatch = 0;
-      
-      for (const token of activeTokens) {
-        // Смотрим, сколько из требуемых разрешений есть у токена
-        const matchedScopes = scopeArray.filter(scope => 
-          token.scope && token.scope.includes(scope)
-        ).length;
-        
-        // Если есть хотя бы одно совпадение и это лучше предыдущего - запоминаем
-        if (matchedScopes > 0 && matchedScopes > bestScopeMatch) {
-          bestToken = token;
-          bestScopeMatch = matchedScopes;
-        }
-        
-        // Если нашли токен со всеми разрешениями - возвращаем его сразу
-        if (matchedScopes === scopeArray.length) {
-          console.log(`Found token with all required scopes: ${token.vkUserId}`);
-          
-          // Обновляем дату использования
-          token.lastUsed = new Date();
-          await token.save();
-          
-          return token;
-        }
-      }
-      
-      // Если нашли токен хотя бы с одним разрешением - используем его
-      if (bestToken) {
-        console.log(`Using token with partial scope match (${bestScopeMatch}/${scopeArray.length}): ${bestToken.vkUserId}`);
-        
-        // Add a warning if we're missing critical permissions
-        if (needsCriticalPermissions && 
-            bestScopeMatch < scopeArray.length) {
-          console.warn(`WARNING: Token is missing some critical permissions: ${
-            scopeArray.filter(scope => !bestToken.scope.includes(scope)).join(', ')
-          }`);
-        }
-        
-        // Обновляем дату использования
-        bestToken.lastUsed = new Date();
-        await bestToken.save();
-        
-        return bestToken;
-      }
-      
-      // Если не нашли подходящий токен, но есть активные - берем первый
+      // Если активные токены есть, возвращаем первый
       if (activeTokens.length > 0) {
-        console.log(`No tokens with required scopes found. Using first active token: ${activeTokens[0].vkUserId}`);
-        console.log(`Available scopes: ${activeTokens[0].scope}`);
+        const token = activeTokens[0];
+        
+        // Для информации логируем права токена (но не используем для фильтрации)
+        if (token.scope) {
+          const scopeStr = Array.isArray(token.scope) ? token.scope.join(', ') : token.scope;
+          console.log(`Selected token has scopes: ${scopeStr} (not filtered)`);
+        }
         
         // Обновляем дату использования
-        activeTokens[0].lastUsed = new Date();
-        await activeTokens[0].save();
+        token.lastUsed = new Date();
+        await token.save();
         
-        return activeTokens[0];
+        return token;
       }
       
+      // Если активных токенов нет, возвращаем null
+      console.log('No active tokens found');
       return null;
+      
     } catch (error) {
       console.error('Error getting active token:', error);
       return null;
     }
   }
-  
   /**
    * Получение всех токенов пользователей
    * @returns {Promise<Array>} Массив токенов

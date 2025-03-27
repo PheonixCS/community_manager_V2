@@ -1174,7 +1174,8 @@ class VkPostingService {
               }
   
               // Загружаем фотографию в ВК
-              await this.uploadPhotoToVkWithRetry(attachment.url, ownerId, token.token, result);
+              console.log(`Token: ${token}`);
+              await this.uploadPhotoToVkWithRetry(attachment.url, ownerId, token, result);
             }
           }
         }

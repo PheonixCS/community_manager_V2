@@ -454,12 +454,20 @@ class PublishTaskService {
         throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
       }
       
-      
+    
       // Выбираем первый активный токен без проверки прав
       let token = null;
       if (activeTokens.length > 0) {
         token = activeTokens[0];
         console.log(`Selected first active token for user ${token.vkUserId}`);
+        
+        // Логируем права токена для информации, но не фильтруем по ним
+        if (token.scope) {
+          const scopeStr = Array.isArray(token.scope) ? token.scope.join(', ') : token.scope;
+          console.log(`Token has the following scopes: ${scopeStr}`);
+        } else {
+          console.log('Token does not have explicit scope information');
+        }
       } else {
         throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
       }
