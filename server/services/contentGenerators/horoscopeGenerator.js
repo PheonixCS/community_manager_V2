@@ -220,7 +220,7 @@ class HoroscopeGenerator {
         try {
           // Generate image
           console.log(`Generating image for ${sign}...`);
-          const imageBuffer = await pythonBridge.generateHoroscopeImage(sign, horoscope.fullText);
+          const imageBuffer = await pythonBridge.generateHoroscopeImage(sign, horoscope.text);
           
           // Upload to S3
           console.log(`Uploading ${fileName} to S3...`);

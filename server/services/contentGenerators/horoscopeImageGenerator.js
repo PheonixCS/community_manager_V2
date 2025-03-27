@@ -75,6 +75,12 @@ class HoroscopeImageGenerator {
     this.fontRate = path.join(resourcesPath, 'fonts/Roboto.ttf');
     this.baseFontRateSize = 60;
 
+    // Layout constants
+    this.headerHeight = 150;  // Space reserved for header
+    this.footerHeight = 150;  // Space reserved for footer
+    this.horizontalPadding = 90; // Padding from sides
+    this.textVerticalPadding = 40; // Padding above and below text
+
     // Register fonts
     try {
       registerFont(this.headerFont, { family: 'BebasNeue' });
@@ -147,14 +153,19 @@ class HoroscopeImageGenerator {
       ctx.fillStyle = 'white';
       const headerWidth = ctx.measureText(header).width;
       const headerX = (1080 - headerWidth) / 2;
-      ctx.fillText(header, headerX, 100);
-      
-      // Calculate and draw text
-      const fontSize = this.calculateTextSize(ctx, text);
-      this.drawTextToCenter(ctx, text, fontSize);
+      ctx.fillText(header, headerX, this.headerHeight - 30);
       
       // Create footer icons - changed from synchronous to async
       const icons = await this.createFooterIcons();
+      
+      // Calculate available space for text
+      const availableHeight = canvas.height - this.headerHeight - this.footerHeight;
+      
+      // Calculate and draw text to fill available space
+      const fontSize = this.calculateOptimalTextSize(ctx, text, availableHeight);
+      this.drawTextToCenter(ctx, text, fontSize, this.headerHeight, this.footerHeight);
+      
+      // Draw footer
       this.drawFooter(ctx, canvas.width, icons);
       
       // Convert to buffer and return
@@ -239,13 +250,14 @@ class HoroscopeImageGenerator {
     return `${day} ${month}, ${ZODIAC_DICT[zodiacSign]}`;
   }
 
-  calculateTextSize(ctx, text, startSize = 60) {
-    let fontSize = startSize;
-    const maxWidth = 1080 * 0.8; // 80% of image width
-    const maxHeight = 600; // Maximum height for text area
+  calculateOptimalTextSize(ctx, text, availableHeight) {
+    const maxWidth = 1080 - 2 * this.horizontalPadding; // Width with padding
+    const maxHeight = availableHeight - 2 * this.textVerticalPadding; // Height with padding
+    
+    // Start with a larger font size
+    let fontSize = 70;
     const minFontSize = 30;
     
-    // Start with largest font and decrease until text fits
     while (fontSize > minFontSize) {
       ctx.font = `${fontSize}px Museo`;
       
@@ -256,14 +268,13 @@ class HoroscopeImageGenerator {
         break;
       }
       
-      fontSize -= 5;
+      fontSize -= 2;
     }
     
     return fontSize;
   }
 
   splitTextToLines(ctx, text, maxWidth) {
-    ctx.font = `${ctx.font.split('px')[0]}px Museo`;
     const words = text.split(' ');
     const lines = [];
     let currentLine = words[0];
@@ -284,19 +295,22 @@ class HoroscopeImageGenerator {
     return lines;
   }
 
-  drawTextToCenter(ctx, text, fontSize) {
+  drawTextToCenter(ctx, text, fontSize, headerHeight, footerHeight) {
     ctx.font = `${fontSize}px Museo`;
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     
-    const maxWidth = 1080 * 0.8; // 80% of image width
+    const maxWidth = 1080 - 2 * this.horizontalPadding;
     const lines = this.splitTextToLines(ctx, text, maxWidth);
     
     // Calculate total height of text
     const totalHeight = lines.length * (fontSize + this.spacing);
     
-    // Start position (centered vertically)
-    let y = (1080 - totalHeight) / 2 + 50; // +50 to adjust for header
+    // Calculate the available vertical space between header and footer
+    const availableSpace = 1080 - headerHeight - footerHeight;
+    
+    // Start position (centered vertically in the available space)
+    let y = headerHeight + (availableSpace - totalHeight) / 2 + fontSize;
     
     // Draw each line
     lines.forEach(line => {
@@ -349,9 +363,11 @@ class HoroscopeImageGenerator {
   }
 
   drawFooter(ctx, width, icons) {
+    // Improved positioning for footer elements
     const iconSpacing = width / 5;
-    const iconY = 1000; // Position from top
-    const iconSize = 60; // Size for the icon images
+    const iconY = 1080 - this.footerHeight / 2; // Center icons vertically in footer area
+    const iconSize = 65;
+    const textOffsetY = 70; // Distance between icon and text
     
     ctx.font = `${this.baseFontRateSize}px Roboto`;
     ctx.fillStyle = 'white';
@@ -361,20 +377,20 @@ class HoroscopeImageGenerator {
     icons.forEach((icon, index) => {
       const x = iconSpacing * (index + 1);
       
-      // If we have a loaded image, draw it above the text
+      // If we have a loaded image, draw it
       if (icon.image) {
-        // Center the icon horizontally, position it above the text
+        // Draw icon
         ctx.drawImage(
           icon.image, 
           x - iconSize/2, 
-          iconY - iconSize - 10, 
+          iconY - textOffsetY, 
           iconSize, 
           iconSize
         );
       }
       
-      // Draw the value below the icon
-      ctx.fillText(icon.value, x, iconY);
+      // Draw the value below the icon with proper spacing
+      ctx.fillText(icon.value, x, iconY + 35);
     });
   }
 }
