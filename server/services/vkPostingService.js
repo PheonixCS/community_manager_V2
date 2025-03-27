@@ -355,43 +355,12 @@ class VkPostingService {
       const postData = {
         owner_id: ownerId,
         message: content.text || '',
+        attachments: attachmentsString ? attachmentsString : "",
         // from_group: options.fromGroup !== false ? 1 : 0,
         // close_comments: options.closeComments ? 1 : 0,
         // mark_as_ads: options.markedAsAds ? 1 : 0
-        _isCarousel: content.isCarousel
+        _isCarousel: content.carouselMode
       };
-      
-      // Добавляем отложенную публикацию, если указана
-      if (options.publishDate) {
-        postData.publish_date = Math.floor(new Date(options.publishDate).getTime() / 1000);
-      }
-      
-      // Добавляем вложения, если есть
-      if (result.attachments.length > 0) {
-        postData.attachments = attachmentsString;
-      }
-      // console.log(`full content:`);
-      // console.log(content);
-      // Включаем режим карусели, если это указано в content или если несколько фото
-      // if ((content.isCarousel || result.attachments.length > 1) && result.attachments.length > 0) {
-      //   postData.primary_attachments_mode = 'carousel';
-      //   console.log('Using carousel mode for attachments');
-      // }
-      
-      // console.log(`Attempting wall.post request with data:`, {
-      //   owner_id: postData.owner_id,
-      //   message_preview: postData.message ? `${postData.message.substring(0, 20)}...` : '(no text)',
-      //   has_attachments: result.attachments.length > 0,
-      //   attachment_count: result.attachments.length
-      // });
-      
-      // Отправляем запрос на публикацию поста
-      // const formData = new URLSearchParams();
-      
-      // // Добавляем все параметры в form data
-      // for (const [key, value] of Object.entries(postData)) {
-      //   formData.append(key, value);
-      // }
       
       // 4. Публикуем пост через VK API
       result = await this.makeWallPostRequest(postData, token);
