@@ -1194,7 +1194,8 @@ class VkPostingService {
       
       // Добавляем опцию карусели, если несколько вложений
       if (content.isCarousel && result.attachments.length > 1) {
-        publishOptions.carousel = 1;
+        publishOptions.primary_attachments_mode = 'carousel';
+        // formData.append('primary_attachments_mode', 'carousel');
       }
       
       // Формируем данные для запроса
