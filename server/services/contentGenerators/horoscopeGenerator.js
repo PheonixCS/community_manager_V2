@@ -168,7 +168,7 @@ class HoroscopeGenerator {
             sign,
             signName: ZODIAC_SIGNS[sign].ru,
             text: `Не удалось получить гороскоп для знака ${ZODIAC_SIGNS[sign].ru}.`,
-            fullText: `Не удалось получить гороскоп для знака ${ZODIAC_SIGNS[sign].ru}.`,
+            fullText: `Не удалось получить гороскоп для знака ${ZODIАК_SIGNS[sign].ru}.`,
             date: new Date(),
             imagePath: null
           };
@@ -286,11 +286,15 @@ class HoroscopeGenerator {
       if (hasImages && !postText.trim() && params.imageType === 'image') {
         postText = "Гороскоп на завтра";
       }
-      console.log(params);
+      
+      // Make sure we always include the carouselMode parameter in the result
+      // Default to true if it's not explicitly set to false
+      const carouselMode = params.carouselMode !== false;
+      
       return {
         text: postText,
         attachments: attachments.length > 0 ? attachments : undefined,
-        isCarousel: params.imageType === 'image' && params.carouselMode && attachments.length > 1
+        isCarousel: params.imageType === 'image' && carouselMode && attachments.length > 1
       };
     } catch (error) {
       console.error('Error formatting horoscope for posting:', error);

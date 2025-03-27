@@ -437,6 +437,8 @@ class PublishTaskService {
    */
   async executeGeneratorTask(task, result) {
     try {
+      console.log('Executing generator task with settings:', JSON.stringify(task.contentGeneratorSettings, null, 2));
+      
       // Генерируем контент - используем сервис напрямую
       const contentGeneratorService = require('./contentGeneratorService');
       const generatedContent = await contentGeneratorService.generateContent(
@@ -447,6 +449,16 @@ class PublishTaskService {
       if (!generatedContent) {
         throw new Error('Failed to generate content');
       }
+      
+      // Explicitly handle carousel mode from parameters
+      if (task.contentGeneratorSettings.params.imageType === 'image' && 
+          'carouselMode' in task.contentGeneratorSettings.params) {
+        generatedContent.isCarousel = task.contentGeneratorSettings.params.carouselMode && 
+          generatedContent.attachments && 
+          generatedContent.attachments.length > 1;
+        console.log(`Set isCarousel to ${generatedContent.isCarousel} for generated content`);
+      }
+      
       // Получаем токен доступа для публикации
       const vkAuthService = require('./vkAuthService');
       const tokens = await vkAuthService.getAllTokens();

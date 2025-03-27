@@ -81,6 +81,7 @@ class ContentGeneratorService {
   async generateContent(generatorId, params = {}) {
     try {
       console.log(`Attempting to generate content with generator: ${generatorId}`);
+      console.log('Generator params:', JSON.stringify(params, null, 2));
       
       // Reload generators to ensure we have the latest version
       if (this.generators.size === 0) {
@@ -107,6 +108,12 @@ class ContentGeneratorService {
       // Проверяем обязательные поля
       if (typeof content.text !== 'string' && !Array.isArray(content.attachments)) {
         throw new Error('Generated content must have either text or attachments');
+      }
+      
+      // Explicitly preserve carouselMode if it exists in params for image content
+      if (params.imageType === 'image' && 'carouselMode' in params) {
+        content.isCarousel = params.carouselMode && content.attachments && content.attachments.length > 1;
+        console.log(`Setting isCarousel to ${content.isCarousel} based on params`);
       }
       
       return content;
