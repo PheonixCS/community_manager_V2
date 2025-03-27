@@ -105,7 +105,8 @@ const VkAuthManager = () => {
     }
   };
 
-  const handleToggleTokenActive = async (tokenId, isActive) => {
+  const handleToggleTokenActive = async (tokenId, isActive, token) => {
+    console.log(token)
     try {
       setTokenActions(prev => ({ ...prev, [tokenId]: 'loading' }));
       
@@ -576,7 +577,7 @@ const VkAuthManager = () => {
                               <IconButton
                                 size="small"
                                 color={token.isActive ? "warning" : "success"}
-                                onClick={() => handleToggleTokenActive(token._id, token.isActive)}
+                                onClick={() => handleToggleTokenActive(token._id, token.isActive, token)}
                                 disabled={tokenActions[token.id] === 'loading'}
                               >
                                 {tokenActions[token.id] === 'loading' ? (
