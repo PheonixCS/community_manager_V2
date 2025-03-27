@@ -344,7 +344,7 @@ class VkPostingService {
         _photosCount: content.attachments ? content.attachments.filter(a => a.type === 'photo').length : 0,
         ...this.preparePublishOptions(options)
       };
-      
+      console.log(options.token);
       // 4. Публикуем пост через VK API
       result = await this.makeWallPostRequest(postData, options.token);
       
