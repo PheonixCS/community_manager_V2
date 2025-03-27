@@ -1128,150 +1128,150 @@ class VkPostingService {
 
   // Add cleanup for S3 images after publishing
 
-  /**
-   * Публикация сгенерированного контента
-   * @param {Object} content - Сгенерированный контент для публикации
-   * @param {string} ownerId - ID сообщества (с префиксом -)
-   * @param {Object} options - Опции публикации
-   * @returns {Promise<Object>} Результат публикации
-   */
-  async publishGeneratedPost(content, ownerId, options = {}) {
-    try {
-      // Проверяем наличие токена
-      const token = await vkAuthService.getActiveToken(['wall', 'photos', 'groups']);
+  // /**
+  //  * Публикация сгенерированного контента
+  //  * @param {Object} content - Сгенерированный контент для публикации
+  //  * @param {string} ownerId - ID сообщества (с префиксом -)
+  //  * @param {Object} options - Опции публикации
+  //  * @returns {Promise<Object>} Результат публикации
+  //  */
+  // async publishGeneratedPost(content, ownerId, options = {}) {
+  //   try {
+  //     // Проверяем наличие токена
+  //     const token = await vkAuthService.getActiveToken(['wall', 'photos', 'groups']);
       
-      if (!token) {
-        throw new Error('Не найден активный токен ВКонтакте');
-      }
+  //     if (!token) {
+  //       throw new Error('Не найден активный токен ВКонтакте');
+  //     }
   
-      // Проверяем наличие текста или вложений
-      if ((!content.text || content.text.trim() === '') && 
-          (!content.attachments || content.attachments.length === 0)) {
-        throw new Error('Нет контента для публикации (текст или вложения)');
-      }
+  //     // Проверяем наличие текста или вложений
+  //     if ((!content.text || content.text.trim() === '') && 
+  //         (!content.attachments || content.attachments.length === 0)) {
+  //       throw new Error('Нет контента для публикации (текст или вложения)');
+  //     }
       
-      // Инициализируем результат
-      const result = {
-        status: 'pending',
-        ownerId: ownerId,
-        attachments: []
-      };
+  //     // Инициализируем результат
+  //     const result = {
+  //       status: 'pending',
+  //       ownerId: ownerId,
+  //       attachments: []
+  //     };
   
-      // Список ключей S3 для последующей очистки
-      const s3KeysToClean = [];
+  //     // Список ключей S3 для последующей очистки
+  //     const s3KeysToClean = [];
   
-      // Загружаем фотографии, если есть
-      if (content.attachments && content.attachments.length > 0) {
-        const photoAttachments = content.attachments.filter(a => a.type === 'photo');
+  //     // Загружаем фотографии, если есть
+  //     if (content.attachments && content.attachments.length > 0) {
+  //       const photoAttachments = content.attachments.filter(a => a.type === 'photo');
         
-        if (photoAttachments.length > 0) {
-          // Собираем URL'ы фотографий для загрузки
-          for (const attachment of photoAttachments) {
-            if (attachment.url) {
-              // Добавляем ключ S3 для очистки если он есть
-              if (attachment.s3Key) {
-                s3KeysToClean.push(attachment.s3Key);
-              }
+  //       if (photoAttachments.length > 0) {
+  //         // Собираем URL'ы фотографий для загрузки
+  //         for (const attachment of photoAttachments) {
+  //           if (attachment.url) {
+  //             // Добавляем ключ S3 для очистки если он есть
+  //             if (attachment.s3Key) {
+  //               s3KeysToClean.push(attachment.s3Key);
+  //             }
   
-              // Загружаем фотографию в ВК
-              console.log(`Token: ${token}`);
-              await this.uploadPhotoToVkWithRetry(attachment.url, ownerId, token.accessToken, result);
-            }
-          }
-        }
-      }
+  //             // Загружаем фотографию в ВК
+  //             console.log(`Token: ${token}`);
+  //             await this.uploadPhotoToVkWithRetry(attachment.url, ownerId, token.accessToken, result);
+  //           }
+  //         }
+  //       }
+  //     }
   
-      // Публикуем пост с текстом и загруженными вложениями
-      const attachmentsString = result.attachments.join(',');
+  //     // Публикуем пост с текстом и загруженными вложениями
+  //     const attachmentsString = result.attachments.join(',');
       
-      // Устанавливаем опции публикации по умолчанию
-      const publishOptions = {
-        from_group: options.fromGroup !== false ? 1 : 0,
-        close_comments: options.closeComments ? 1 : 0,
-        mark_as_ads: options.markedAsAds ? 1 : 0
-      };
+  //     // Устанавливаем опции публикации по умолчанию
+  //     const publishOptions = {
+  //       from_group: options.fromGroup !== false ? 1 : 0,
+  //       close_comments: options.closeComments ? 1 : 0,
+  //       mark_as_ads: options.markedAsAds ? 1 : 0
+  //     };
       
       
       
-      // Формируем данные для запроса
-      const postData = {
-        owner_id: ownerId,
-        message: content.text || '',
-        ...publishOptions
-      };
+  //     // Формируем данные для запроса
+  //     const postData = {
+  //       owner_id: ownerId,
+  //       message: content.text || '',
+  //       ...publishOptions
+  //     };
 
-      // Добавляем опцию карусели, если несколько вложений
-      if (content.isCarousel && result.attachments.length > 1) {
-        // publishOptions.primary_attachments_mode = 'carousel';
-        formData.append('primary_attachments_mode', 'carousel');
-      }
+  //     // Добавляем опцию карусели, если несколько вложений
+  //     if (content.isCarousel && result.attachments.length > 1) {
+  //       // publishOptions.primary_attachments_mode = 'carousel';
+  //       formData.append('primary_attachments_mode', 'carousel');
+  //     }
 
       
-      // Добавляем вложения, если есть
-      if (result.attachments.length > 0) {
-        postData.attachments = attachmentsString;
-      }
+  //     // Добавляем вложения, если есть
+  //     if (result.attachments.length > 0) {
+  //       postData.attachments = attachmentsString;
+  //     }
       
-      // Для отладки
-      console.log(`Attempting wall.post request with data: ${JSON.stringify({
-        owner_id: postData.owner_id,
-        message_preview: postData.message ? `${postData.message.substring(0, 20)}...` : 'No message',
-        has_attachments: result.attachments.length > 0,
-        primary_attachments_mode: postData.primary_attachments_mod
-      }, null, 2)}`);
+  //     // Для отладки
+  //     console.log(`Attempting wall.post request with data: ${JSON.stringify({
+  //       owner_id: postData.owner_id,
+  //       message_preview: postData.message ? `${postData.message.substring(0, 20)}...` : 'No message',
+  //       has_attachments: result.attachments.length > 0,
+  //       primary_attachments_mode: postData.primary_attachments_mod
+  //     }, null, 2)}`);
   
-      // Добавляем логирование длины сообщения
-      if (content.text) {
-        console.log(`Message length is ${content.text.length} characters (first 100 characters):\n${content.text.substring(0, 100)}...`);
-      }
+  //     // Добавляем логирование длины сообщения
+  //     if (content.text) {
+  //       console.log(`Message length is ${content.text.length} characters (first 100 characters):\n${content.text.substring(0, 100)}...`);
+  //     }
       
-      // Отправляем запрос на публикацию поста
-      const response = await axios.get('https://api.vk.com/method/wall.post', {
-        params: {
-          ...postData,
-          access_token: token.accessToken,
-          v: vkApiVersion
-        }
-      });
+  //     // Отправляем запрос на публикацию поста
+  //     const response = await axios.get('https://api.vk.com/method/wall.post', {
+  //       params: {
+  //         ...postData,
+  //         access_token: token.accessToken,
+  //         v: vkApiVersion
+  //       }
+  //     });
       
-      if (response.data.error) {
-        throw new Error(`ВКонтакте API error: ${response.data.error.error_msg}`);
-      }
+  //     if (response.data.error) {
+  //       throw new Error(`ВКонтакте API error: ${response.data.error.error_msg}`);
+  //     }
       
-      // Успешная публикация
-      console.log(`Successfully posted to wall, post ID: ${response.data.response.post_id}`);
-      result.status = 'success';
-      result.postId = response.data.response.post_id;
-      result.vkUrl = `https://vk.com/wall${ownerId}_${response.data.response.post_id}`;
+  //     // Успешная публикация
+  //     console.log(`Successfully posted to wall, post ID: ${response.data.response.post_id}`);
+  //     result.status = 'success';
+  //     result.postId = response.data.response.post_id;
+  //     result.vkUrl = `https://vk.com/wall${ownerId}_${response.data.response.post_id}`;
       
-      // Сохраняем в базу данных, если это указано в опциях
-      if (options.saveToDatabase) {
-        try {
-          // ...existing code for saving to database...
-        } catch (dbError) {
-          console.error('Error saving generated post to database:', dbError);
-        }
-      }
+  //     // Сохраняем в базу данных, если это указано в опциях
+  //     if (options.saveToDatabase) {
+  //       try {
+  //         // ...existing code for saving to database...
+  //       } catch (dbError) {
+  //         console.error('Error saving generated post to database:', dbError);
+  //       }
+  //     }
   
-      // Очистка временных файлов в S3
-      if (s3KeysToClean.length > 0) {
-        try {
-          this.cleanupS3Files(s3KeysToClean);
-        } catch (cleanupError) {
-          console.error('Error cleaning up S3 files:', cleanupError);
-          // Не прерываем выполнение, так как пост уже опубликован
-        }
-      }
+  //     // Очистка временных файлов в S3
+  //     if (s3KeysToClean.length > 0) {
+  //       try {
+  //         this.cleanupS3Files(s3KeysToClean);
+  //       } catch (cleanupError) {
+  //         console.error('Error cleaning up S3 files:', cleanupError);
+  //         // Не прерываем выполнение, так как пост уже опубликован
+  //       }
+  //     }
       
-      return result;
-    } catch (error) {
-      console.error('Error publishing generated content:', error);
-      return {
-        status: 'error',
-        error: error.message
-      };
-    }
-  }
+  //     return result;
+  //   } catch (error) {
+  //     console.error('Error publishing generated content:', error);
+  //     return {
+  //       status: 'error',
+  //       error: error.message
+  //     };
+  //   }
+  // }
 
   /**
    * Очистка временных файлов в S3
