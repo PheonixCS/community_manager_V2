@@ -272,7 +272,6 @@ class HoroscopeGenerator {
           attachments.push({
             type: 'photo',
             url: horoscope.imageUrl,
-            isCarousel: params.carouselMode,
             s3Key: horoscope.s3Key // Include S3 key for later cleanup
           });
         }
@@ -287,7 +286,7 @@ class HoroscopeGenerator {
       if (hasImages && !postText.trim() && params.imageType === 'image') {
         postText = "Гороскоп на завтра";
       }
-      
+      console.log(params);
       return {
         text: postText,
         attachments: attachments.length > 0 ? attachments : undefined,
