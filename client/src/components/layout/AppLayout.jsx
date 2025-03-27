@@ -240,6 +240,17 @@ const AppLayout = ({ children }) => {
                 </ListItemIcon>
                 <ListItemText primary="Шаблоны фильтров" />
               </ListItem>
+              <ListItem 
+                button 
+                component={Link} 
+                to="/cleanup"
+                selected={isActive('/cleanup')}
+              >
+                <ListItemIcon>
+                  <DashboardIcon />
+                </ListItemIcon>
+                <ListItemText primary="Очистка" />
+              </ListItem>
             </List>
           </>
         ) : (
