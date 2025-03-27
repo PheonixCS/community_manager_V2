@@ -432,6 +432,7 @@ class PublishTaskService {
       } 
       
       // Публикуем сгенерированный контент в каждую целевую группу
+      console.log(activeToken);
       for (const targetGroup of task.targetGroups) {
         try {
           const publishResult = await vkPostingService.publishGeneratedPost(
