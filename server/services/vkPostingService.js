@@ -289,11 +289,11 @@ class VkPostingService {
       // Получаем токен из опций или через стандартный метод
       
       // 1. Получаем токен публикации
-      let tokenString = await this.getPublishToken();
-      if (!tokenString) {
+      const token = await this.getPublishToken();
+      if (!token) {
         throw new Error('Failed to get publish token. Authorize VK user first.');
       }
-      // console.log(tokenString);
+      // console.log(token);
       // return;
       
       
@@ -333,7 +333,7 @@ class VkPostingService {
                 console.log(`Uploading photo from URL: ${publicUrl}`);
                 
                 // Загружаем фотографию в ВКонтакте
-                const photoResult = await this.uploadPhotoToVkWithRetry(publicUrl, tokenString, ownerId);
+                const photoResult = await this.uploadPhotoToVkWithRetry(publicUrl, token, ownerId);
                 
                 if (photoResult && photoResult.attachment) {
                   result.attachments.push(photoResult.attachment);
@@ -394,12 +394,12 @@ class VkPostingService {
       // }
       
       // 4. Публикуем пост через VK API
-      result = await this.makeWallPostRequest(postData, tokenString);
+      result = await this.makeWallPostRequest(postData, token);
       
       // 5. Если опция pinned установлена, закрепляем пост
       if (options.pinned) {
         try {
-          await this.pinPost(result.post_id, communityId, tokenString);
+          await this.pinPost(result.post_id, communityId, token);
         } catch (pinError) {
           console.error(`Error pinning post ${result.post_id}:`, pinError);
           // Не прерываем процесс, если закрепление не удалось
@@ -415,7 +415,7 @@ class VkPostingService {
       // Если нужно закрепить пост
       // if (options.pinned) {
       //   try {
-      //     await this.pinPost(response.data.response.post_id, ownerId, tokenString);
+      //     await this.pinPost(response.data.response.post_id, ownerId, token);
       //   } catch (pinError) {
       //     console.error(`Error pinning post ${response.data.response.post_id}:`, pinError);
       //     // Не прерываем процесс, если закрепление не удалось
@@ -1271,166 +1271,166 @@ class VkPostingService {
     }
   }
 
-  /**
-   * Загрузка фотографии в ВКонтакте с повторными попытками
-   * @param {string} photoUrl - URL фотографии
-   * @param {string} ownerId - ID сообщества
-   * @param {string} token - Токен доступа
-   * @param {Object} result - Объект для обновления результатами
-   */
-  async uploadPhotoToVkWithRetry(photoUrl, ownerId, token, result) {
-    const maxRetries = 3;
-    let lastError = null;
+  // /**
+  //  * Загрузка фотографии в ВКонтакте с повторными попытками
+  //  * @param {string} photoUrl - URL фотографии
+  //  * @param {string} ownerId - ID сообщества
+  //  * @param {string} token - Токен доступа
+  //  * @param {Object} result - Объект для обновления результатами
+  //  */
+  // async uploadPhotoToVkWithRetry(photoUrl, ownerId, token, result) {
+  //   const maxRetries = 3;
+  //   let lastError = null;
     
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Photo upload attempt ${attempt}/${maxRetries} for ${photoUrl}`);
+  //   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  //     try {
+  //       console.log(`Photo upload attempt ${attempt}/${maxRetries} for ${photoUrl}`);
         
-        // Проверка, что URL действительно корректный
-        if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
-          throw new Error(`Invalid URL format: ${photoUrl}`);
-        }
+  //       // Проверка, что URL действительно корректный
+  //       if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+  //         throw new Error(`Invalid URL format: ${photoUrl}`);
+  //       }
         
-        const uploadResult = await this.uploadPhotoToVk(photoUrl, ownerId, token);
-        result.attachments.push(uploadResult.attachment);
+  //       const uploadResult = await this.uploadPhotoToVk(photoUrl, ownerId, token);
+  //       result.attachments.push(uploadResult.attachment);
         
-        console.log(`Photo upload successful on attempt ${attempt}: ${uploadResult.attachment}`);
-        return uploadResult; // Успешно загрузили фото, возвращаем результат
-      } catch (error) {
-        lastError = error;
-        console.error(`Photo upload attempt ${attempt}/${maxRetries} failed:`, error.message);
+  //       console.log(`Photo upload successful on attempt ${attempt}: ${uploadResult.attachment}`);
+  //       return uploadResult; // Успешно загрузили фото, возвращаем результат
+  //     } catch (error) {
+  //       lastError = error;
+  //       console.error(`Photo upload attempt ${attempt}/${maxRetries} failed:`, error.message);
         
-        if (!this.isRetryableError(error) || attempt === maxRetries) {
-          console.error("Error doesn't seem retryable, breaking retry loop");
-          break;
-        }
+  //       if (!this.isRetryableError(error) || attempt === maxRetries) {
+  //         console.error("Error doesn't seem retryable, breaking retry loop");
+  //         break;
+  //       }
         
-        // Экспоненциальная задержка между попытками
-        const delay = Math.pow(2, attempt - 1) * 1000;
-        console.log(`Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
+  //       // Экспоненциальная задержка между попытками
+  //       const delay = Math.pow(2, attempt - 1) * 1000;
+  //       console.log(`Retrying in ${delay}ms...`);
+  //       await new Promise(resolve => setTimeout(resolve, delay));
+  //     }
+  //   }
     
-    // Если все попытки неудачны, выбрасываем исключение
-    console.error(`Failed to upload photo after ${maxRetries} attempts`, lastError);
-    throw lastError || new Error('Unknown error during photo upload');
-  }
+  //   // Если все попытки неудачны, выбрасываем исключение
+  //   console.error(`Failed to upload photo after ${maxRetries} attempts`, lastError);
+  //   throw lastError || new Error('Unknown error during photo upload');
+  // }
 
   // Метод проверки, можно ли повторить запрос при ошибке
-  isRetryableError(error) {
-    // Сетевые ошибки, ошибки времени ожидания и некоторые ошибки ВК API можно повторять
-    const retryStatuses = [429, 500, 502, 503, 504]; // Too many requests, server errors
-    const retryMessages = [
-      'ETIMEDOUT',
-      'ECONNRESET',
-      'ECONNREFUSED',
-      'Too many requests',
-      'Internal server error',
-      'Bad gateway',
-      'Service unavailable',
-      'Gateway timeout',
-      'Too many requests per second'
-    ];
+  // isRetryableError(error) {
+  //   // Сетевые ошибки, ошибки времени ожидания и некоторые ошибки ВК API можно повторять
+  //   const retryStatuses = [429, 500, 502, 503, 504]; // Too many requests, server errors
+  //   const retryMessages = [
+  //     'ETIMEDOUT',
+  //     'ECONNRESET',
+  //     'ECONNREFUSED',
+  //     'Too many requests',
+  //     'Internal server error',
+  //     'Bad gateway',
+  //     'Service unavailable',
+  //     'Gateway timeout',
+  //     'Too many requests per second'
+  //   ];
     
-    // Проверка кода статуса
-    if (error.response && retryStatuses.includes(error.response.status)) {
-      return true;
-    }
+  //   // Проверка кода статуса
+  //   if (error.response && retryStatuses.includes(error.response.status)) {
+  //     return true;
+  //   }
     
-    // Проверка сообщения об ошибке
-    if (error.message) {
-      return retryMessages.some(msg => error.message.includes(msg));
-    }
+  //   // Проверка сообщения об ошибке
+  //   if (error.message) {
+  //     return retryMessages.some(msg => error.message.includes(msg));
+  //   }
     
-    return false; // По умолчанию считаем, что ошибку нельзя повторять
-  }
+  //   return false; // По умолчанию считаем, что ошибку нельзя повторять
+  // }
 
-  /**
-   * Загрузка фотографии в ВКонтакте
-   * @param {string} photoUrl - URL фотографии
-   * @param {string} ownerId - ID сообщества
-   * @param {string} token - Токен доступа
-   * @returns {Promise<Object>} Результат загрузки
-   */
-  async uploadPhotoToVk(photoUrl, ownerId, token) {
-    try {
-      // Add debug log
-      console.log(`Starting photo upload to VK. URL: ${photoUrl}, Community ID: ${ownerId}`);
+  // /**
+  //  * Загрузка фотографии в ВКонтакте
+  //  * @param {string} photoUrl - URL фотографии
+  //  * @param {string} ownerId - ID сообщества
+  //  * @param {string} token - Токен доступа
+  //  * @returns {Promise<Object>} Результат загрузки
+  //  */
+  // async uploadPhotoToVk(photoUrl, ownerId, token) {
+  //   try {
+  //     // Add debug log
+  //     console.log(`Starting photo upload to VK. URL: ${photoUrl}, Community ID: ${ownerId}`);
       
-      // Step 1: Get server for photo upload
-      const serverResponse = await axios.get('https://api.vk.com/method/photos.getWallUploadServer', {
-        params: {
-          group_id: Math.abs(parseInt(ownerId)).toString(), // VK requires positive ID without the minus
-          access_token: token,
-          v: vkApiVersion // Use the defined constant
-        }
-      });
+  //     // Step 1: Get server for photo upload
+  //     const serverResponse = await axios.get('https://api.vk.com/method/photos.getWallUploadServer', {
+  //       params: {
+  //         group_id: Math.abs(parseInt(ownerId)).toString(), // VK requires positive ID without the minus
+  //         access_token: token,
+  //         v: vkApiVersion // Use the defined constant
+  //       }
+  //     });
       
-      if (serverResponse.data.error) {
-        throw new Error(`VK API error: ${serverResponse.data.error.error_msg}`);
-      }
+  //     if (serverResponse.data.error) {
+  //       throw new Error(`VK API error: ${serverResponse.data.error.error_msg}`);
+  //     }
       
-      const uploadUrl = serverResponse.data.response.upload_url;
-      console.log(`Got upload server URL: ${uploadUrl}`);
+  //     const uploadUrl = serverResponse.data.response.upload_url;
+  //     console.log(`Got upload server URL: ${uploadUrl}`);
       
-      // Step 2: Download the image from URL and upload to VK server
-      console.log(`Downloading image from: ${photoUrl}`);
-      const photoResponse = await axios.get(photoUrl, {
-        responseType: 'arraybuffer'
-      });
+  //     // Step 2: Download the image from URL and upload to VK server
+  //     console.log(`Downloading image from: ${photoUrl}`);
+  //     const photoResponse = await axios.get(photoUrl, {
+  //       responseType: 'arraybuffer'
+  //     });
       
-      console.log(`Successfully downloaded image, size: ${photoResponse.data.byteLength} bytes`);
+  //     console.log(`Successfully downloaded image, size: ${photoResponse.data.byteLength} bytes`);
       
-      const FormData = require('form-data');
-      const formData = new FormData();
-      formData.append('photo', Buffer.from(photoResponse.data), {
-        filename: `photo_${Date.now()}.png`,
-        contentType: 'image/png'
-      });
+  //     const FormData = require('form-data');
+  //     const formData = new FormData();
+  //     formData.append('photo', Buffer.from(photoResponse.data), {
+  //       filename: `photo_${Date.now()}.png`,
+  //       contentType: 'image/png'
+  //     });
       
-      console.log('Uploading photo to VK server...');
-      const uploadResponse = await axios.post(uploadUrl, formData, {
-        headers: {
-          ...formData.getHeaders()
-        }
-      });
+  //     console.log('Uploading photo to VK server...');
+  //     const uploadResponse = await axios.post(uploadUrl, formData, {
+  //       headers: {
+  //         ...formData.getHeaders()
+  //       }
+  //     });
       
-      console.log('Upload response received:', uploadResponse.data);
+  //     console.log('Upload response received:', uploadResponse.data);
       
-      if (!uploadResponse.data || uploadResponse.data.error || !uploadResponse.data.photo || uploadResponse.data.photo === 'null') {
-        console.error('Invalid upload response:', uploadResponse.data);
-        throw new Error('Failed to upload photo to VK server: invalid response');
-      }
+  //     if (!uploadResponse.data || uploadResponse.data.error || !uploadResponse.data.photo || uploadResponse.data.photo === 'null') {
+  //       console.error('Invalid upload response:', uploadResponse.data);
+  //       throw new Error('Failed to upload photo to VK server: invalid response');
+  //     }
       
-      // Step 3: Save the uploaded photo to wall
-      console.log('Saving photo to wall...');
-      const saveResponse = await axios.get('https://api.vk.com/method/photos.saveWallPhoto', {
-        params: {
-          group_id: Math.abs(parseInt(ownerId)).toString(),
-          photo: uploadResponse.data.photo,
-          server: uploadResponse.data.server,
-          hash: uploadResponse.data.hash,
-          access_token: token,
-          v: vkApiVersion // Use the defined constant
-        }
-      });
+  //     // Step 3: Save the uploaded photo to wall
+  //     console.log('Saving photo to wall...');
+  //     const saveResponse = await axios.get('https://api.vk.com/method/photos.saveWallPhoto', {
+  //       params: {
+  //         group_id: Math.abs(parseInt(ownerId)).toString(),
+  //         photo: uploadResponse.data.photo,
+  //         server: uploadResponse.data.server,
+  //         hash: uploadResponse.data.hash,
+  //         access_token: token,
+  //         v: vkApiVersion // Use the defined constant
+  //       }
+  //     });
       
-      if (saveResponse.data.error) {
-        throw new Error(`VK API error: ${saveResponse.data.error.error_msg}`);
-      }
+  //     if (saveResponse.data.error) {
+  //       throw new Error(`VK API error: ${saveResponse.data.error.error_msg}`);
+  //     }
       
-      // Step 4: Return attachment string
-      const photo = saveResponse.data.response[0];
-      const attachment = `photo${photo.owner_id}_${photo.id}`;
+  //     // Step 4: Return attachment string
+  //     const photo = saveResponse.data.response[0];
+  //     const attachment = `photo${photo.owner_id}_${photo.id}`;
       
-      console.log(`Successfully saved photo with ID: ${attachment}`);
-      return { attachment, photoData: photo };
-    } catch (error) {
-      console.error('Error uploading photo to VK:', error.message);
-      throw error;
-    }
-  }
+  //     console.log(`Successfully saved photo with ID: ${attachment}`);
+  //     return { attachment, photoData: photo };
+  //   } catch (error) {
+  //     console.error('Error uploading photo to VK:', error.message);
+  //     throw error;
+  //   }
+  // }
 }
 
 module.exports = new VkPostingService();
