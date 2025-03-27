@@ -397,4 +397,15 @@ class HoroscopeImageGenerator {
 
 const generator = new HoroscopeImageGenerator();
 console.log('HoroscopeImageGenerator initialized successfully');
-module.exports = generator;
+
+// If you're exporting the generator directly and the frontend expects an array
+// Wrap it in an array-like object with a map function
+const wrappedGenerator = {
+  ...generator,
+  map: function(callback) {
+    // If the frontend is mapping over generators, provide compatibility
+    return [callback(generator)];
+  }
+};
+
+module.exports = wrappedGenerator;
