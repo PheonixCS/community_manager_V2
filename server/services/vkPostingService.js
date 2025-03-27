@@ -294,7 +294,7 @@ class VkPostingService {
       
       // Список ключей S3 для последующей очистки
       const s3KeysToClean = [];
-      
+      console.log(options.token);
       // Загружаем фотографии, если они есть и формируем строку вложений
       if (content.attachments && content.attachments.length > 0) {
         const photoAttachments = content.attachments.filter(a => a.type === 'photo');
@@ -344,7 +344,7 @@ class VkPostingService {
         _photosCount: content.attachments ? content.attachments.filter(a => a.type === 'photo').length : 0,
         ...this.preparePublishOptions(options)
       };
-      console.log(options.token);
+      
       // 4. Публикуем пост через VK API
       result = await this.makeWallPostRequest(postData, options.token);
       
