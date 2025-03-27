@@ -19,10 +19,14 @@ class TokenRefreshService {
       return;
     }
     
-    // Запускаем проверку токенов каждый час
-    this.scheduledJob = cron.schedule('0 * * * *', async () => {
+    // Запускаем проверку токенов каждые 25 минут
+    this.scheduledJob = cron.schedule('*/25 * * * *', async () => {
       await this.checkAndRefreshTokens();
     });
+    const checkAfteInit = async () => {
+      await this.checkAndRefreshTokens();
+    };
+    checkAfteInit();
     
     this.initialized = true;
     console.log('Token refresh service initialized');
@@ -55,13 +59,13 @@ class TokenRefreshService {
       let failedCount = 0;
       
       for (const token of tokens) {
-        // Если токен истекает в ближайшие 24 часа и есть refresh_token - обновляем его
+        // Если токен истекает в ближайшие 30 минут и есть refresh_token - обновляем его
         const expiresInSeconds = token.expiresAt - Math.floor(Date.now() / 1000);
         
-        if (expiresInSeconds < 86400 && token.refreshToken) {
+        if (expiresInSeconds < 1800 && token.refreshToken) {
           try {
             console.log(`Token for user ${token.vkUserId} expires in ${expiresInSeconds} seconds, refreshing...`);
-            await vkAuthService.refreshToken(token.vkUserId);
+            await vkAuthService.refreshToken(token.deviceId, token.refreshToken);
             refreshedCount++;
           } catch (error) {
             console.error(`Failed to refresh token for user ${token.vkUserId}:`, error);

@@ -331,63 +331,43 @@ class VkAuthService {
   
   /**
    * Обновление истекшего токена через refresh_token
-   * @param {string} vkUserId - ID пользователя ВК
-   * @returns {Promise<Object|null>} Обновленный токен или null в случае ошибки
-   */
-  async refreshToken(vkUserId) {
+   * @param {string} deviceId - Идентификатор устройства
+   * @param {string} refreshToken - Токен для обновления
+   * @returns {Promise<Object>} Обновленный токен
+  */
+  async refreshToken(deviceId, refreshToken) {
     try {
-      // Получаем токен из базы
-      const token = await VkUserToken.findOne({ vkUserId });
-      
-      if (!token || !token.refreshToken) {
-        throw new Error(`No token or refresh token found for user ${vkUserId}`);
-      }
-      
+      console.log(`Attempting to refresh token with device ID: ${deviceId}`);
+    
+      // Получаем ID приложения из конфигурации
       const appId = config.vk.appId || await this.getAppIdFromSettings();
-      const appSecret = config.vk.appSecret || await this.getAppSecretFromSettings();
       
-      if (!appId || !appSecret) {
-        throw new Error('VK App ID or Secret not configured');
+      if (!appId) {
+        throw new Error('VK App ID not configured');
       }
       
-      // Use the same device_id that was used for token acquisition if available
-      const deviceId = token.deviceId || 'web_default_device';
+      // Генерируем случайный state для безопасности
+      const state = this.generateRandomString(32);
       
-      // Use correct POST request with form-data for refresh
+      // Формируем запрос точно в том формате, который указан
       const formData = new URLSearchParams();
-      formData.append('client_id', appId);
-      formData.append('client_secret', appSecret);
-      formData.append('refresh_token', token.refreshToken);
-      formData.append('device_id', deviceId); // Include device_id for refresh token
       formData.append('grant_type', 'refresh_token');
+      formData.append('refresh_token', refreshToken);
+      formData.append('client_id', appId);
+      formData.append('device_id', deviceId);
+      formData.append('state', state);
       
-      // Make POST request to refresh endpoint
-      const response = await axios.post('https://oauth.vk.com/access_token', formData, {
+      // Делаем POST запрос на указанный endpoint
+      const response = await axios.post('https://id.vk.com/oauth2/auth', formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
       
-      if (response.data.error) {
-        throw new Error(`VK API Error: ${response.data.error_description || response.data.error}`);
-      }
+      console.log('Token refresh response:', response.data);
       
-      // Обновляем данные токена
-      token.accessToken = response.data.access_token;
-      
-      if (response.data.refresh_token) {
-        token.refreshToken = response.data.refresh_token;
-      }
-      
-      token.expiresAt = response.data.expires_in ? 
-        Math.floor(Date.now() / 1000) + response.data.expires_in : 
-        Math.floor(Date.now() / 1000) + 86400; // Default to 24 hours
-        
-      token.lastRefreshed = new Date();
-      
-      await token.save();
-      
-      return token;
+      return response.data;
+
     } catch (error) {
       console.error(`Error refreshing token for user ${vkUserId}:`, error);
       
