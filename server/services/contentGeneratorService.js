@@ -7,13 +7,29 @@ const path = require('path');
 class ContentGeneratorService {
   constructor() {
     this.generators = new Map();
-    this.loadGenerators();
+    this.initialized = false;
+  }
+
+  /**
+   * Initialize the service
+   */
+  async initialize() {
+    if (this.initialized) return;
+    
+    try {
+      await this.loadGenerators();
+      this.initialized = true;
+      console.log(`ContentGeneratorService initialized successfully with ${this.generators.size} generators`);
+    } catch (error) {
+      console.error('Failed to initialize ContentGeneratorService:', error);
+      throw error;
+    }
   }
 
   /**
    * Загружает все доступные генераторы контента
    */
-  loadGenerators() {
+  async loadGenerators() {
     try {
       console.log('Loading content generators...');
       // Загружаем встроенные генераторы
@@ -26,19 +42,52 @@ class ContentGeneratorService {
         console.log(`Created generators directory: ${generatorsPath}`);
       }
       
-      const files = fs.readdirSync(generatorsPath);
-      console.log(`Found ${files.length} files in generators directory`);
-      
-      const generatorFiles = files.filter(file => file.endsWith('.js'));
-      console.log(`Found ${generatorFiles.length} JavaScript files in generators directory`);
-      
       // Очищаем текущие генераторы перед загрузкой
       this.generators.clear();
       
-      generatorFiles.forEach(file => {
+      // First, try to load the index file if it exists
+      const indexPath = path.join(generatorsPath, 'index.js');
+      if (fs.existsSync(indexPath)) {
+        try {
+          console.log('Found index.js file, trying to load generators from index');
+          delete require.cache[require.resolve(indexPath)];
+          
+          const indexModule = require(indexPath);
+          if (indexModule && typeof indexModule.registerGenerators === 'function') {
+            // If index has a registerGenerators function, use it
+            const registeredGenerators = await indexModule.registerGenerators();
+            if (Array.isArray(registeredGenerators)) {
+              for (const generator of registeredGenerators) {
+                if (generator && generator.id && typeof generator.generateContent === 'function') {
+                  this.generators.set(generator.id, generator);
+                  console.log(`Successfully loaded content generator from index: ${generator.name || generator.id}`);
+                }
+              }
+            }
+            // If index handled registration, we might be done
+            if (this.generators.size > 0 && indexModule.exclusiveRegistration === true) {
+              console.log(`Index registered ${this.generators.size} generators exclusively`);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error loading generators from index.js:', error);
+          // Continue with individual file loading as fallback
+        }
+      }
+      
+      // Load individual files
+      const files = fs.readdirSync(generatorsPath);
+      console.log(`Found ${files.length} files in generators directory`);
+      
+      const generatorFiles = files.filter(file => 
+        file.endsWith('.js') && file !== 'index.js' && !file.includes('Bridge')
+      );
+      console.log(`Found ${generatorFiles.length} potential generator files`);
+      
+      for (const file of generatorFiles) {
         try {
           console.log(`Attempting to load generator from file: ${file}`);
-          // Очищаем кеш модуля перед загрузкой, чтобы обеспечить свежую версию
           const modulePath = path.join(generatorsPath, file);
           delete require.cache[require.resolve(modulePath)];
           
@@ -47,6 +96,17 @@ class ContentGeneratorService {
           if (generator && generator.id && typeof generator.generateContent === 'function') {
             this.generators.set(generator.id, generator);
             console.log(`Successfully loaded content generator: ${generator.name || generator.id}`);
+          } else if (generator && typeof generator.getGenerators === 'function') {
+            // Handle modules that export multiple generators
+            const moduleGenerators = await generator.getGenerators();
+            if (Array.isArray(moduleGenerators)) {
+              for (const gen of moduleGenerators) {
+                if (gen.id && typeof gen.generateContent === 'function') {
+                  this.generators.set(gen.id, gen);
+                  console.log(`Successfully loaded content generator: ${gen.name || gen.id}`);
+                }
+              }
+            }
           } else {
             console.warn(`Skipping invalid generator in file ${file}. Missing id or generateContent method.`);
             if (generator) {
@@ -56,7 +116,7 @@ class ContentGeneratorService {
         } catch (error) {
           console.error(`Error loading generator from file ${file}:`, error);
         }
-      });
+      }
       
       console.log(`Total content generators loaded: ${this.generators.size}`);
       if (this.generators.size === 0) {
@@ -69,6 +129,7 @@ class ContentGeneratorService {
       }
     } catch (error) {
       console.error('Error loading content generators:', error);
+      throw error;
     }
   }
 
@@ -79,6 +140,11 @@ class ContentGeneratorService {
    * @returns {Promise<Object>} Сгенерированный контент
    */
   async generateContent(generatorId, params = {}) {
+    // Make sure service is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
     try {
       console.log(`Attempting to generate content with generator: ${generatorId}`);
       console.log('Generator params:', JSON.stringify(params, null, 2));
@@ -89,10 +155,10 @@ class ContentGeneratorService {
         console.log(`Using carouselMode=${params.carouselMode} for content generation`);
       }
       
-      // Reload generators to ensure we have the latest version
+      // Reload generators if needed
       if (this.generators.size === 0) {
         console.log('No generators loaded, attempting to load them now');
-        this.loadGenerators();
+        await this.loadGenerators();
       }
       
       const generator = this.generators.get(generatorId);
@@ -133,7 +199,12 @@ class ContentGeneratorService {
    * Получение доступных генераторов контента
    * @returns {Array<Object>} Массив генераторов
    */
-  getAvailableGenerators() {
+  async getAvailableGenerators() {
+    // Make sure service is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
     // Возвращаем массив с информацией о генераторах (без методов)
     return Array.from(this.generators.values()).map(generator => ({
       id: generator.id,
@@ -148,10 +219,27 @@ class ContentGeneratorService {
    * @param {string} generatorId - ID генератора
    * @returns {Array<Object>} Массив параметров
    */
-  getGeneratorParams(generatorId) {
+  async getGeneratorParams(generatorId) {
+    // Make sure service is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
     const generator = this.generators.get(generatorId);
     return generator ? generator.params || [] : [];
   }
+
+  /**
+   * Reload generators (useful for development and testing)
+   */
+  async reloadGenerators() {
+    console.log('Reloading content generators...');
+    await this.loadGenerators();
+    return this.getAvailableGenerators();
+  }
 }
 
-module.exports = new ContentGeneratorService();
+// Create a singleton instance
+const contentGeneratorService = new ContentGeneratorService();
+
+module.exports = contentGeneratorService;
