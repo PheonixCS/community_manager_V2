@@ -1207,7 +1207,7 @@ class VkPostingService {
         formData.append('primary_attachments_mode', 'carousel');
       }
 
-      console.log(`Attempting wall.post request with data: ${JSON.stringify(postData, null, 2)}`);
+      
       // Добавляем вложения, если есть
       if (result.attachments.length > 0) {
         postData.attachments = attachmentsString;
@@ -1217,7 +1217,8 @@ class VkPostingService {
       console.log(`Attempting wall.post request with data: ${JSON.stringify({
         owner_id: postData.owner_id,
         message_preview: postData.message ? `${postData.message.substring(0, 20)}...` : 'No message',
-        has_attachments: result.attachments.length > 0
+        has_attachments: result.attachments.length > 0,
+        primary_attachments_mode: postData.primary_attachments_mod
       }, null, 2)}`);
   
       // Добавляем логирование длины сообщения
