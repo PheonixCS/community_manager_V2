@@ -91,7 +91,8 @@ app.use((err, req, res, next) => {
 // Подключение к MongoDB
 mongoose.connect(config.mongoURI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  directConnection: true
 })
   .then(() => {
     console.log('MongoDB connected');
