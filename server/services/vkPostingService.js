@@ -1204,7 +1204,7 @@ class VkPostingService {
         message: content.text || '',
         ...publishOptions
       };
-      
+      console.log(`Attempting wall.post request with data: ${JSON.stringify(postData, null, 2)}`);
       // Добавляем вложения, если есть
       if (result.attachments.length > 0) {
         postData.attachments = attachmentsString;
