@@ -199,24 +199,44 @@ router.get('/history/post/:postId', async (req, res) => {
  */
 router.get('/generators', async (req, res) => {
   try {
-    // Используем сервис напрямую вместо вызова через publishTaskService
-    const generators = contentGeneratorService.getAvailableGenerators();
-    console.log(`Retrieved ${generators.length} content generators`);
+    // Debug log to see if we're reaching this point
+    console.log('GET /api/publishing/generators endpoint called');
     
-    // Если список пуст, проверим, что генераторы загружены
-    if (generators.length === 0) {
-      // Попробуем перезагрузить генераторы
-      contentGeneratorService.loadGenerators();
-      const reloadedGenerators = contentGeneratorService.getAvailableGenerators();
-      console.log(`After reload: ${reloadedGenerators.length} content generators`);
+    // Get generators from service
+    const generators = contentGeneratorService.getAvailableGenerators();
+    console.log(`Retrieved ${generators ? generators.length : 'undefined'} content generators`);
+    
+    // Add detailed logging
+    if (!generators || generators.length === 0) {
+      console.log('No generators found. Attempting to reload...');
       
-      return res.json(reloadedGenerators);
+      // Force reload generators
+      await contentGeneratorService.loadGenerators();
+      const reloadedGenerators = contentGeneratorService.getAvailableGenerators();
+      console.log(`After reload: ${reloadedGenerators ? reloadedGenerators.length : 'undefined'} content generators`);
+      
+      // If still empty, check what's in the directory
+      const fs = require('fs');
+      const path = require('path');
+      const generatorsDir = path.join(__dirname, '../../services/contentGenerators');
+      
+      if (fs.existsSync(generatorsDir)) {
+        const files = fs.readdirSync(generatorsDir);
+        console.log(`Files in generators directory: ${files.join(', ')}`);
+      } else {
+        console.log(`Generators directory does not exist: ${generatorsDir}`);
+      }
+      
+      return res.json(reloadedGenerators || []);
     }
     
     return res.json(generators);
   } catch (error) {
     console.error('Error fetching content generators:', error);
-    return res.status(500).json({ error: 'Error fetching content generators' });
+    return res.status(500).json({ 
+      error: 'Error fetching content generators',
+      details: error.message 
+    });
   }
 });
 

@@ -1,245 +1,185 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('../utils/logger');
 
 /**
- * Сервис для управления генераторами контента
+ * Service for managing and executing content generators
  */
 class ContentGeneratorService {
   constructor() {
-    this.generators = new Map();
-    this.initialized = false;
+    this.generators = [];
+    this.isInitialized = false;
+    this.generatorsDir = path.join(__dirname, 'contentGenerators');
+    this.generatorRegistry = null;
   }
 
   /**
-   * Initialize the service
+   * Initialize the service and load all generators
    */
-  async initialize() {
-    if (this.initialized) return;
-    
-    try {
-      await this.loadGenerators();
-      this.initialized = true;
-      console.log(`ContentGeneratorService initialized successfully with ${this.generators.size} generators`);
-    } catch (error) {
-      console.error('Failed to initialize ContentGeneratorService:', error);
-      throw error;
-    }
+  initialize() {
+    logger.info('Initializing ContentGeneratorService');
+    this.loadGenerators();
+    this.isInitialized = true;
+    return Promise.resolve();
   }
 
   /**
-   * Загружает все доступные генераторы контента
+   * Load all available generators
    */
   async loadGenerators() {
     try {
-      console.log('Loading content generators...');
-      // Загружаем встроенные генераторы
-      const generatorsPath = path.join(__dirname, 'contentGenerators');
-      console.log(`Checking for generators in path: ${generatorsPath}`);
-      
-      if (!fs.existsSync(generatorsPath)) {
-        console.warn(`Generators path does not exist: ${generatorsPath}`);
-        fs.mkdirSync(generatorsPath, { recursive: true });
-        console.log(`Created generators directory: ${generatorsPath}`);
+      // Clear existing generators
+      this.generators = [];
+
+      // Check if generators directory exists
+      if (!fs.existsSync(this.generatorsDir)) {
+        logger.warn(`Generators directory not found: ${this.generatorsDir}`);
+        return;
       }
-      
-      // Очищаем текущие генераторы перед загрузкой
-      this.generators.clear();
-      
-      // First, try to load the index file if it exists
-      const indexPath = path.join(generatorsPath, 'index.js');
-      if (fs.existsSync(indexPath)) {
+
+      // Try to load the generator registry
+      const registryPath = path.join(this.generatorsDir, 'index.js');
+      if (fs.existsSync(registryPath)) {
         try {
-          console.log('Found index.js file, trying to load generators from index');
-          delete require.cache[require.resolve(indexPath)];
+          // Clear require cache to ensure fresh load
+          delete require.cache[require.resolve(registryPath)];
           
-          const indexModule = require(indexPath);
-          if (indexModule && typeof indexModule.registerGenerators === 'function') {
-            // If index has a registerGenerators function, use it
-            const registeredGenerators = await indexModule.registerGenerators();
+          // Load the registry
+          this.generatorRegistry = require(registryPath);
+          
+          // If registry has registerGenerators function, use it
+          if (this.generatorRegistry && typeof this.generatorRegistry.registerGenerators === 'function') {
+            const registeredGenerators = await this.generatorRegistry.registerGenerators();
+            
             if (Array.isArray(registeredGenerators)) {
-              for (const generator of registeredGenerators) {
-                if (generator && generator.id && typeof generator.generateContent === 'function') {
-                  this.generators.set(generator.id, generator);
-                  console.log(`Successfully loaded content generator from index: ${generator.name || generator.id}`);
-                }
-              }
+              this.generators = [...registeredGenerators];
+              logger.info(`Loaded ${this.generators.length} generators from registry`);
+            } else {
+              logger.warn('Generator registry did not return an array');
             }
-            // If index handled registration, we might be done
-            if (this.generators.size > 0 && indexModule.exclusiveRegistration === true) {
-              console.log(`Index registered ${this.generators.size} generators exclusively`);
+            
+            // If registry is exclusive, return early
+            if (this.generatorRegistry.exclusiveRegistration === true) {
               return;
             }
           }
-        } catch (error) {
-          console.error('Error loading generators from index.js:', error);
-          // Continue with individual file loading as fallback
+        } catch (registryError) {
+          logger.error('Error loading generator registry:', registryError);
         }
       }
+
+      // Load individual generator files
+      const files = fs.readdirSync(this.generatorsDir);
       
-      // Load individual files
-      const files = fs.readdirSync(generatorsPath);
-      console.log(`Found ${files.length} files in generators directory`);
-      
-      const generatorFiles = files.filter(file => 
-        file.endsWith('.js') && file !== 'index.js' && !file.includes('Bridge')
-      );
-      console.log(`Found ${generatorFiles.length} potential generator files`);
-      
-      for (const file of generatorFiles) {
-        try {
-          console.log(`Attempting to load generator from file: ${file}`);
-          const modulePath = path.join(generatorsPath, file);
-          delete require.cache[require.resolve(modulePath)];
+      for (const file of files) {
+        if (file !== 'index.js' && file.endsWith('.js') && !file.startsWith('_')) {
+          const fullPath = path.join(this.generatorsDir, file);
           
-          const generator = require(modulePath);
-          
-          if (generator && generator.id && typeof generator.generateContent === 'function') {
-            this.generators.set(generator.id, generator);
-            console.log(`Successfully loaded content generator: ${generator.name || generator.id}`);
-          } else if (generator && typeof generator.getGenerators === 'function') {
-            // Handle modules that export multiple generators
-            const moduleGenerators = await generator.getGenerators();
-            if (Array.isArray(moduleGenerators)) {
-              for (const gen of moduleGenerators) {
-                if (gen.id && typeof gen.generateContent === 'function') {
-                  this.generators.set(gen.id, gen);
-                  console.log(`Successfully loaded content generator: ${gen.name || gen.id}`);
+          try {
+            // Clear require cache for this file
+            delete require.cache[require.resolve(fullPath)];
+            
+            // Load the generator module
+            const generatorModule = require(fullPath);
+            
+            // Handle direct generator exports
+            if (generatorModule && generatorModule.id && typeof generatorModule.generateContent === 'function') {
+              // Check if generator with this ID already exists
+              const existingIndex = this.generators.findIndex(g => g.id === generatorModule.id);
+              
+              if (existingIndex >= 0) {
+                // Replace existing generator
+                this.generators[existingIndex] = generatorModule;
+                logger.info(`Updated generator: ${generatorModule.id}`);
+              } else {
+                // Add new generator
+                this.generators.push(generatorModule);
+                logger.info(`Loaded generator: ${generatorModule.id}`);
+              }
+            } 
+            // Handle wrapped generators (checks for map function from wrapped export)
+            else if (generatorModule && typeof generatorModule.map === 'function') {
+              const wrappedGen = generatorModule;
+              // If it has the required properties directly, register it too
+              if (wrappedGen.id && typeof wrappedGen.generateContent === 'function') {
+                const existingIndex = this.generators.findIndex(g => g.id === wrappedGen.id);
+                
+                if (existingIndex >= 0) {
+                  this.generators[existingIndex] = wrappedGen;
+                  logger.info(`Updated wrapped generator: ${wrappedGen.id}`);
+                } else {
+                  this.generators.push(wrappedGen);
+                  logger.info(`Loaded wrapped generator: ${wrappedGen.id}`);
                 }
               }
             }
-          } else {
-            console.warn(`Skipping invalid generator in file ${file}. Missing id or generateContent method.`);
-            if (generator) {
-              console.warn(`Generator details: id=${generator.id}, hasGenerateMethod=${!!generator.generateContent}`);
+            // Handle modules with getGenerators function
+            else if (generatorModule && typeof generatorModule.getGenerators === 'function') {
+              try {
+                const moduleGenerators = await generatorModule.getGenerators();
+                
+                if (Array.isArray(moduleGenerators)) {
+                  for (const gen of moduleGenerators) {
+                    if (gen && gen.id && typeof gen.generateContent === 'function') {
+                      const existingIndex = this.generators.findIndex(g => g.id === gen.id);
+                      
+                      if (existingIndex >= 0) {
+                        this.generators[existingIndex] = gen;
+                        logger.info(`Updated generator: ${gen.id}`);
+                      } else {
+                        this.generators.push(gen);
+                        logger.info(`Loaded generator: ${gen.id}`);
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                logger.error(`Error calling getGenerators for ${file}:`, error);
+              }
             }
+          } catch (error) {
+            logger.error(`Error loading generator from ${file}:`, error);
           }
-        } catch (error) {
-          console.error(`Error loading generator from file ${file}:`, error);
         }
       }
-      
-      console.log(`Total content generators loaded: ${this.generators.size}`);
-      if (this.generators.size === 0) {
-        console.log('No generators were loaded. Check if the generator files exist and are valid.');
-      } else {
-        // Показать загруженные генераторы
-        for (const [id, generator] of this.generators.entries()) {
-          console.log(`> Loaded generator: ${id} (${generator.name || 'unnamed'})`);
-        }
-      }
+
+      logger.info(`Total loaded generators: ${this.generators.length}`);
     } catch (error) {
-      console.error('Error loading content generators:', error);
-      throw error;
+      logger.error('Error loading generators:', error);
     }
   }
 
   /**
-   * Генерирует контент с использованием указанного генератора
-   * @param {string} generatorId - ID генератора
-   * @param {Object} params - Параметры генерации
-   * @returns {Promise<Object>} Сгенерированный контент
+   * Get all available generators
+   */
+  getAvailableGenerators() {
+    return this.generators;
+  }
+
+  /**
+   * Generate content using specified generator
+   * @param {string} generatorId - ID of the generator to use
+   * @param {object} params - Parameters to pass to the generator
+   * @returns {Promise<object>} Generated content
    */
   async generateContent(generatorId, params = {}) {
-    // Make sure service is initialized
-    if (!this.initialized) {
-      await this.initialize();
-    }
-    
     try {
-      console.log(`Attempting to generate content with generator: ${generatorId}`);
-      console.log('Generator params:', JSON.stringify(params, null, 2));
-      
-      // Ensure carouselMode is set with proper default for image content
-      if (params.imageType === 'image') {
-        params.carouselMode = params.carouselMode !== false; // Default to true if not explicitly false
-        console.log(`Using carouselMode=${params.carouselMode} for content generation`);
-      }
-      
-      // Reload generators if needed
-      if (this.generators.size === 0) {
-        console.log('No generators loaded, attempting to load them now');
-        await this.loadGenerators();
-      }
-      
-      const generator = this.generators.get(generatorId);
+      const generator = this.generators.find(g => g.id === generatorId);
       
       if (!generator) {
-        console.error(`Generator with ID "${generatorId}" not found. Available generators: ${[...this.generators.keys()].join(', ')}`);
-        throw new Error(`Generator with ID "${generatorId}" not found`);
+        throw new Error(`Generator not found: ${generatorId}`);
       }
       
-      console.log(`Generating content with ${generator.name || generator.id}...`);
-      
-      // Передаем управление генератору
-      const content = await generator.generateContent(params);
-      
-      if (!content) {
-        throw new Error('Generator returned empty content');
+      if (typeof generator.generateContent !== 'function') {
+        throw new Error(`Invalid generator: ${generatorId} (missing generateContent method)`);
       }
       
-      // Проверяем обязательные поля
-      if (typeof content.text !== 'string' && !Array.isArray(content.attachments)) {
-        throw new Error('Generated content must have either text or attachments');
-      }
-      
-      // Explicitly preserve carouselMode if it exists in params for image content
-      if (params.imageType === 'image' && 'carouselMode' in params) {
-        content.isCarousel = params.carouselMode && content.attachments && content.attachments.length > 1;
-        console.log(`Setting isCarousel to ${content.isCarousel} based on params`);
-      }
-      
-      return content;
+      return await generator.generateContent(params);
     } catch (error) {
-      console.error('Error generating content:', error);
+      logger.error(`Error generating content with ${generatorId}:`, error);
       throw error;
     }
-  }
-
-  /**
-   * Получение доступных генераторов контента
-   * @returns {Array<Object>} Массив генераторов
-   */
-  async getAvailableGenerators() {
-    // Make sure service is initialized
-    if (!this.initialized) {
-      await this.initialize();
-    }
-    
-    // Возвращаем массив с информацией о генераторах (без методов)
-    return Array.from(this.generators.values()).map(generator => ({
-      id: generator.id,
-      name: generator.name || generator.id,
-      description: generator.description || '',
-      params: generator.params || []
-    }));
-  }
-
-  /**
-   * Получение параметров генератора по ID
-   * @param {string} generatorId - ID генератора
-   * @returns {Array<Object>} Массив параметров
-   */
-  async getGeneratorParams(generatorId) {
-    // Make sure service is initialized
-    if (!this.initialized) {
-      await this.initialize();
-    }
-    
-    const generator = this.generators.get(generatorId);
-    return generator ? generator.params || [] : [];
-  }
-
-  /**
-   * Reload generators (useful for development and testing)
-   */
-  async reloadGenerators() {
-    console.log('Reloading content generators...');
-    await this.loadGenerators();
-    return this.getAvailableGenerators();
   }
 }
 
-// Create a singleton instance
-const contentGeneratorService = new ContentGeneratorService();
-
-module.exports = contentGeneratorService;
+module.exports = new ContentGeneratorService();

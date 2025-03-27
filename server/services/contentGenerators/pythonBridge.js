@@ -122,3 +122,63 @@ class PythonBridge {
 }
 
 module.exports = new PythonBridge();
+
+/**
+ * Bridge to Python scripts for content generation
+ */
+const { exec } = require('child_process');
+const fs = require('fs').promises;
+const path = require('path');
+const horoscopeImageGenerator = require('./horoscopeImageGenerator');
+
+/**
+ * Fetch horoscope text for a specific sign
+ * @param {string} sign - Zodiac sign
+ * @returns {Promise<Object>} Horoscope data
+ */
+async function fetchHoroscopeText(sign) {
+  // This is a mock implementation
+  console.log(`Fetching horoscope text for ${sign}`);
+
+  // Generate some mock horoscope text
+  const texts = [
+    'Сегодня вам улыбнется удача в финансовых делах. Не бойтесь брать инициативу в свои руки.',
+    'Благоприятный день для начала новых проектов. Звезды на вашей стороне.',
+    'Сложный день для общения с близкими. Постарайтесь быть терпеливее и внимательнее.',
+    'Сегодня вы почувствуете прилив энергии. Используйте её для решения накопившихся проблем.',
+    'Хороший день для отдыха и самопознания. Уделите время себе и своим мыслям.',
+    'Не торопите события. Сегодня лучше всё тщательно обдумать, прежде чем принимать решения.'
+  ];
+  
+  const randomText = texts[Math.floor(Math.random() * texts.length)];
+  const fullText = randomText + ' ' + texts[Math.floor(Math.random() * texts.length)];
+  
+  // Return mock horoscope data
+  return {
+    sign,
+    text: randomText,
+    full_text: fullText,
+    date: new Date().toISOString()
+  };
+}
+
+/**
+ * Generate horoscope image for a specific sign
+ * @param {string} sign - Zodiac sign
+ * @param {string} text - Horoscope text
+ * @returns {Promise<Buffer>} Image buffer
+ */
+async function generateHoroscopeImage(sign, text) {
+  try {
+    // Use the JavaScript implementation
+    return await horoscopeImageGenerator.generateHoroscopeImage(sign, text);
+  } catch (error) {
+    console.error(`Error generating horoscope image: ${error.message}`);
+    throw error;
+  }
+}
+
+module.exports = {
+  fetchHoroscopeText,
+  generateHoroscopeImage
+};
