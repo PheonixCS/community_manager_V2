@@ -106,7 +106,6 @@ const VkAuthManager = () => {
   };
 
   const handleToggleTokenActive = async (tokenId, isActive, token) => {
-    console.log(token);
     try {
       setTokenActions(prev => ({ ...prev, [tokenId]: 'loading' }));
       
@@ -490,7 +489,7 @@ const VkAuthManager = () => {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <Avatar 
-                              src={token.userInfo?.photo}
+                              src={token.userInfo?.photo_200}
                               alt={token.vkUserName}
                               sx={{ mr: 2 }}
                             />
