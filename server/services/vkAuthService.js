@@ -335,7 +335,7 @@ class VkAuthService {
    * @param {string} refreshToken - Токен для обновления
    * @returns {Promise<Object>} Обновленный токен
   */
-  async refreshToken(deviceId, refreshToken) {
+  async refreshToken(deviceId, refreshToken, vkUserId) {
     try {
       console.log(`Attempting to refresh token with device ID: ${deviceId}`);
     
@@ -365,7 +365,12 @@ class VkAuthService {
       });
       
       console.log('Token refresh response:', response.data);
-      
+      const token = await VkUserToken.findOne({ vkUserId });
+      if (!token) {
+        throw new Error(`Token for user ${vkUserId} not found`);
+      }
+      token.isActive = true;
+      token.accessToken = response.data.access_token;
       return response.data;
 
     } catch (error) {
@@ -472,7 +477,7 @@ class VkAuthService {
       
       // Если токен истек, но есть refresh token - обновляем перед активацией
       if (token.isExpired() && token.refreshToken) {
-        await this.refreshToken(token.vkUserId);
+        await this.refreshToken(token.deviceId, token.refreshToken, token.vkUserId);
       }
       
       token.isActive = true;

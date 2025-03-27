@@ -65,7 +65,7 @@ class TokenRefreshService {
         if (expiresInSeconds < 1800 && token.refreshToken) {
           try {
             console.log(`Token for user ${token.vkUserId} expires in ${expiresInSeconds} seconds, refreshing...`);
-            await vkAuthService.refreshToken(token.deviceId, token.refreshToken);
+            await vkAuthService.refreshToken(token.deviceId, token.refreshToken, token.vkUserId);
             refreshedCount++;
           } catch (error) {
             console.error(`Failed to refresh token for user ${token.vkUserId}:`, error);
