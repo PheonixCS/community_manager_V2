@@ -1192,11 +1192,7 @@ class VkPostingService {
         mark_as_ads: options.markedAsAds ? 1 : 0
       };
       
-      // Добавляем опцию карусели, если несколько вложений
-      if (content.isCarousel && result.attachments.length > 1) {
-        publishOptions.primary_attachments_mode = 'carousel';
-        // formData.append('primary_attachments_mode', 'carousel');
-      }
+      
       
       // Формируем данные для запроса
       const postData = {
@@ -1204,6 +1200,13 @@ class VkPostingService {
         message: content.text || '',
         ...publishOptions
       };
+
+      // Добавляем опцию карусели, если несколько вложений
+      if (content.isCarousel && result.attachments.length > 1) {
+        // publishOptions.primary_attachments_mode = 'carousel';
+        formData.append('primary_attachments_mode', 'carousel');
+      }
+
       console.log(`Attempting wall.post request with data: ${JSON.stringify(postData, null, 2)}`);
       // Добавляем вложения, если есть
       if (result.attachments.length > 0) {
