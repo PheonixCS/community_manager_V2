@@ -32,11 +32,10 @@ class VkPostingService {
    */
   async getPublishToken() {
     try {
-      // Make sure our required permissions list includes manage and groups (needed for wall posting)
       const requiredScopes = ['wall', 'photos', 'groups', 'manage'];
       console.log(`Looking for token with these scopes: ${requiredScopes.join(', ')}`);
       
-      // Get all active tokens first
+      // Получаем токены через vkAuthService для единообразия
       const allTokens = await vkAuthService.getAllTokens();
       const activeTokens = allTokens.filter(t => t.isActive && !t.isExpired());
       
@@ -46,26 +45,33 @@ class VkPostingService {
       
       console.log(`Found ${activeTokens.length} active tokens`);
       
-      // We need a token with wall, photos, groups and manage permissions
-      // For posting to community walls, we need wall + manage permission
+      // Ищем токены с правами wall и manage
       for (const token of activeTokens) {
         const tokenScopes = token.scope || [];
-        console.log(`Token ${token.vkUserId} has scopes: ${tokenScopes.join(', ')}`);
+        console.log(`Token ${token.vkUserId} has scopes: ${Array.isArray(tokenScopes) ? tokenScopes.join(', ') : tokenScopes}`);
         
-        // Check specifically if token has wall AND manage rights for posting to community walls
-        // if (tokenScopes.includes('wall')) {
-        console.log(`Found token with wall+manage access rights: ${token.vkUserId}`);
-        
-        // Update last used date
-        token.lastUsed = new Date();
-        await token.save();
-        
-        return token.accessToken;
-        // }
+        // Проверяем наличие обоих прав: wall и manage
+        if ((Array.isArray(tokenScopes) && tokenScopes.includes('wall') && tokenScopes.includes('manage')) ||
+            (typeof tokenScopes === 'string' && tokenScopes.includes('wall') && tokenScopes.includes('manage'))) {
+          console.log(`Found token with wall+manage access rights: ${token.vkUserId}`);
+          
+          // Обновляем дату последнего использования
+          token.lastUsed = new Date();
+          await token.save();
+          
+          // Возвращаем строку токена для совместимости
+          return token.accessToken;
+        }
       }
       
-      // If we get here, no token had the proper rights
-      throw new Error('Не найден токен с правами на публикацию в сообществах (необходимы права "wall" и "manage"). Пожалуйста, удалите текущий токен и выполните авторизацию заново, предоставив все запрашиваемые разрешения.');
+      // Если подходящий токен не найден, выбираем первый активный как запасной вариант
+      console.warn('No token with both wall and manage permissions found. Using first active token.');
+      
+      // Обновляем дату последнего использования
+      activeTokens[0].lastUsed = new Date();
+      await activeTokens[0].save();
+      
+      return activeTokens[0].accessToken;
     } catch (error) {
       console.error('Error getting VK publish token:', error);
       throw error;
@@ -270,74 +276,206 @@ class VkPostingService {
   }
 
   /**
-   * Публикация сгенерированного на лету поста
-   * @param {Object} postData - Данные поста для публикации
-   * @param {string} communityId - ID сообщества ВК (формат: -12345)
-   * @param {Object} options - Дополнительные опции публикации
+   * Публикация сгенерированного контента
+   * @param {Object} content - Сгенерированный контент для публикации
+   * @param {string} ownerId - ID сообщества (с префиксом -)
+   * @param {Object} options - Опции публикации
    * @returns {Promise<Object>} Результат публикации
-   */
-  async publishGeneratedPost(postData, communityId, options = {}) {
+  */
+  async publishGeneratedPost(content, ownerId, options = {}) {
     try {
-      console.log(`Publishing generated post to community ${communityId}`);
+      console.log(`Publishing generated content to ${ownerId}`);
       
-      // 1. Получаем токен публикации
-      const token = await this.getPublishToken();
-      if (!token) {
-        throw new Error('Failed to get publish token. Authorize VK user first.');
+      // Получаем токен из опций или через стандартный метод
+      let tokenString;
+      if (options.token) {
+        // Если передали токен в опциях напрямую
+        tokenString = options.token;
+        console.log("Using token from options");
+      } else {
+        try {
+          // Получение токена через vkAuthService
+          const tokenObj = await vkAuthService.getActiveToken(['wall', 'photos', 'groups', 'manage']);
+          
+          if (!tokenObj) {
+            throw new Error('No active token with required permissions found');
+          }
+          
+          tokenString = tokenObj.accessToken;
+          console.log(`Using token from vkAuthService for user ${tokenObj.vkUserId}`);
+        } catch (tokenError) {
+          console.error('Error getting token from vkAuthService:', tokenError);
+          
+          // Запасной вариант через наш метод getPublishToken
+          tokenString = await this.getPublishToken();
+          console.log("Using token from getPublishToken method as fallback");
+        }
       }
       
-      // 2. Проверяем, что postData содержит необходимые данные
-      if (!postData || typeof postData !== 'object') {
-        throw new Error('Invalid post data provided');
+      if (!tokenString) {
+        throw new Error('No valid token available for publishing. Please authorize with VK first.');
       }
       
-      // 3. Подготавливаем данные для публикации
-      const publishData = {
-        owner_id: communityId,
-        message: postData.text || '',
-        // Добавляем attachments, если есть
-        attachments: await this.prepareAttachments(postData.attachments, token, communityId),
-        // Применяем опции публикации
-        ...this.preparePublishOptions(options)
+      // Проверяем наличие текста или вложений
+      if ((!content.text || content.text.trim() === '') && 
+          (!content.attachments || content.attachments.length === 0)) {
+        throw new Error('No content to publish (text or attachments)');
+      }
+      
+      // Инициализируем результат
+      const result = {
+        status: 'pending',
+        ownerId: ownerId,
+        attachments: []
       };
       
-      // 4. Публикуем пост через VK API
-      const result = await this.makeWallPostRequest(publishData, token);
+      // Список ключей S3 для последующей очистки
+      const s3KeysToClean = [];
       
-      // 5. Если опция pinned установлена, закрепляем пост
+      // Загружаем фотографии, если они есть
+      if (content.attachments && content.attachments.length > 0) {
+        const photoAttachments = content.attachments.filter(a => a.type === 'photo');
+        
+        if (photoAttachments.length > 0) {
+          console.log(`Processing ${photoAttachments.length} photo attachments`);
+          
+          for (const attachment of photoAttachments) {
+            if (attachment.url) {
+              // Добавляем ключ S3 для очистки если он есть
+              if (attachment.s3Key) {
+                s3KeysToClean.push(attachment.s3Key);
+              }
+              
+              try {
+                // Преобразуем локальные URLs в публичные
+                const publicUrl = this.convertLocalUrlToPublic(attachment.url);
+                console.log(`Uploading photo from URL: ${publicUrl}`);
+                
+                // Загружаем фотографию в ВКонтакте
+                const photoResult = await this.uploadPhotoToVkWithRetry(publicUrl, tokenString, ownerId);
+                
+                if (photoResult && photoResult.attachment) {
+                  result.attachments.push(photoResult.attachment);
+                  console.log(`Successfully uploaded photo: ${photoResult.attachment}`);
+                }
+              } catch (uploadError) {
+                console.error(`Error uploading photo ${attachment.url}:`, uploadError);
+                // Продолжаем с другими фото в случае ошибки
+              }
+            }
+          }
+        }
+      }
+      
+      // Публикуем пост с текстом и загруженными вложениями
+      const attachmentsString = result.attachments.join(',');
+      
+      // Формируем данные для запроса
+      const postData = {
+        owner_id: ownerId,
+        message: content.text || '',
+        from_group: options.fromGroup !== false ? 1 : 0,
+        close_comments: options.closeComments ? 1 : 0,
+        mark_as_ads: options.markedAsAds ? 1 : 0
+      };
+      
+      // Добавляем отложенную публикацию, если указана
+      if (options.publishDate) {
+        postData.publish_date = Math.floor(new Date(options.publishDate).getTime() / 1000);
+      }
+      
+      // Добавляем вложения, если есть
+      if (result.attachments.length > 0) {
+        postData.attachments = attachmentsString;
+      }
+      
+      // Включаем режим карусели, если это указано в content или если несколько фото
+      if ((content.isCarousel || result.attachments.length > 1) && result.attachments.length > 0) {
+        postData.primary_attachments_mode = 'carousel';
+        console.log('Using carousel mode for attachments');
+      }
+      
+      console.log(`Attempting wall.post request with data:`, {
+        owner_id: postData.owner_id,
+        message_preview: postData.message ? `${postData.message.substring(0, 20)}...` : '(no text)',
+        has_attachments: result.attachments.length > 0,
+        attachment_count: result.attachments.length
+      });
+      
+      // Отправляем запрос на публикацию поста
+      const formData = new URLSearchParams();
+      
+      // Добавляем все параметры в form data
+      for (const [key, value] of Object.entries(postData)) {
+        formData.append(key, value);
+      }
+      
+      // Добавляем токен и версию API
+      formData.append('access_token', tokenString);
+      formData.append('v', vkApiVersion);
+      
+      // Выполняем запрос
+      const response = await axios.post('https://api.vk.com/method/wall.post', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+      
+      if (response.data.error) {
+        throw new Error(`VK API error: ${response.data.error.error_msg}`);
+      }
+      
+      // Успешная публикация
+      console.log(`Successfully posted to wall, post ID: ${response.data.response.post_id}`);
+      result.status = 'success';
+      result.postId = response.data.response.post_id;
+      result.vkUrl = `https://vk.com/wall${ownerId}_${response.data.response.post_id}`;
+      
+      // Если нужно закрепить пост
       if (options.pinned) {
         try {
-          await this.pinPost(result.post_id, communityId, token);
+          await this.pinPost(response.data.response.post_id, ownerId, tokenString);
         } catch (pinError) {
-          console.error(`Error pinning post ${result.post_id}:`, pinError);
+          console.error(`Error pinning post ${response.data.response.post_id}:`, pinError);
           // Не прерываем процесс, если закрепление не удалось
         }
       }
       
-      // 6. Если нужно сохранить сгенерированный пост в базу, делаем это здесь
-      let savedPost = null;
+      // Сохраняем в базу данных, если это указано в опциях
       if (options.saveToDatabase) {
-        savedPost = await this.saveGeneratedPostToDatabase(
-          postData, 
-          result, 
-          communityId,
-          options.taskId
-        );
+        try {
+          const savedPost = await this.saveGeneratedPostToDatabase(
+            content, 
+            response.data.response, 
+            ownerId,
+            options.taskId
+          );
+          
+          if (savedPost) {
+            result.savedPost = {
+              id: savedPost._id,
+              message: 'Post also saved to database'
+            };
+          }
+        } catch (dbError) {
+          console.error('Error saving generated post to database:', dbError);
+        }
       }
       
-      return {
-        status: 'success',
-        postId: result.post_id,
-        message: `Generated post successfully published to VK community ${communityId}`,
-        vkUrl: `https://vk.com/wall${communityId}_${result.post_id}`,
-        savedPost: savedPost ? {
-          id: savedPost._id,
-          message: 'Post also saved to database'
-        } : null
-      };
+      // Очистка временных файлов в S3
+      if (s3KeysToClean.length > 0) {
+        try {
+          await this.cleanupS3Files(s3KeysToClean);
+        } catch (cleanupError) {
+          console.error('Error cleaning up S3 files:', cleanupError);
+          // Не прерываем выполнение, так как пост уже опубликован
+        }
+      }
+      
+      return result;
       
     } catch (error) {
-      console.error('Error publishing generated post:', error);
+      console.error('Error publishing generated content:', error);
       return {
         status: 'error',
         error: error.message

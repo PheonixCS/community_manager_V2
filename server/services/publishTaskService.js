@@ -445,7 +445,32 @@ class PublishTaskService {
       if (!generatedContent) {
         throw new Error('Failed to generate content');
       }
+      // Получаем токен доступа для публикации
+      const vkAuthService = require('./vkAuthService');
+      const tokens = await vkAuthService.getAllTokens();
+      const activeTokens = tokens.filter(t => t.isActive && !t.isExpired());
       
+      if (activeTokens.length === 0) {
+        throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
+      }
+      
+      // Выбираем первый активный токен с необходимыми правами
+      let token = null;
+      for (const t of activeTokens) {
+        if (t.scope && 
+          ((Array.isArray(t.scope) && t.scope.includes('wall')) || 
+            (typeof t.scope === 'string' && t.scope.includes('wall')))) {
+          token = t;
+          break;
+        }
+      }
+      
+      if (!token) {
+        throw new Error('Нет токенов с необходимыми правами доступа (wall+photos)');
+      }
+      
+      console.log(`Using token for user ${token.vkUserId} for content publishing`);
+  
       // Публикуем сгенерированный контент в каждую целевую группу
       for (const targetGroup of task.targetGroups) {
         try {
@@ -455,7 +480,8 @@ class PublishTaskService {
             {
               ...task.publishOptions,
               saveToDatabase: true,
-              taskId: task._id
+              taskId: task._id,
+              token: token
             }
           );
           
