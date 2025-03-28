@@ -390,32 +390,35 @@ const PublishTaskList = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', gap: 2 }}>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                             <Tooltip title="Успешные публикации">
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <SuccessIcon color="success" fontSize="small" sx={{ mr: 0.5 }} />
-                                <Typography variant="body2">
-                                  {task.statistics?.successfulPublications || 0}
-                                </Typography>
-                              </Box>
+                              <Chip
+                                icon={<SuccessIcon />}
+                                label={task.statistics?.successfulPublications || 0}
+                                size="small"
+                                color="success"
+                                variant="outlined"
+                              />
                             </Tooltip>
                             
                             <Tooltip title="Ошибки публикации">
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <ErrorIcon color="error" fontSize="small" sx={{ mr: 0.5 }} />
-                                <Typography variant="body2">
-                                  {task.statistics?.failedPublications || 0}
-                                </Typography>
-                              </Box>
+                              <Chip
+                                icon={<ErrorIcon />}
+                                label={task.statistics?.failedPublications || 0}
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                              />
                             </Tooltip>
                             
                             <Tooltip title="Всего запусков">
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <TotalExecutionsIcon color="primary" fontSize="small" sx={{ mr: 0.5 }} />
-                                <Typography variant="body2">
-                                  {task.statistics?.totalExecutions || 0}
-                                </Typography>
-                              </Box>
+                              <Chip
+                                icon={<TotalExecutionsIcon />}
+                                label={task.statistics?.totalExecutions || 0}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
                             </Tooltip>
                           </Box>
                         </TableCell>
