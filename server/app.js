@@ -69,7 +69,7 @@ app.use('/api/media', require('./routes/mediaRoutes'));
 app.use('/api/cleanup', require('./routes/api/cleanup'));
 
 // 4. Обслуживание статических файлов React в production - ПОСЛЕ API маршрутов!
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === 'production' || true) {
   console.log('Serving static React files from:', path.join(__dirname, '../client/build'));
   // Указываем Express раздавать файлы из папки build клиента
   app.use(express.static(path.join(__dirname, '../client/build')));
