@@ -44,6 +44,7 @@ module.exports = {
   port: process.env.PORT || 5000,
   mongoURI: process.env.MONGO_URI || 'mongodb://vkapp:3dbU24GfKmhw8hnLV8Ob@127.0.0.1:27017/vk_scraper',
   vk: vkConfig,
+  NODE_ENV: process.env.NODE_ENV || 'development',
   vkApi: {
     // ID приложения ВКонтакте
     appId: 52750600,

@@ -34,17 +34,31 @@ fs.ensureDirSync(path.resolve(__dirname, config.ytdlp.downloadDir));
 
 const app = express();
 
-// Add debug middleware to track all requests
-app.use((req, res, next) => {
-  // Skip logging for static content
-  if (!req.path.startsWith('/api/')) {
-    return next();
-  }
+// Обслуживание статических файлов React в production
+if (process.env.NODE_ENV === 'production') {
+  // Указываем Express раздавать файлы из папки build клиента
+  app.use(express.static(path.join(__dirname, '../client/build')));
   
-  // console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
+  // Для любых запросов, не относящихся к API, возвращаем React-приложение
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  });
+}
+
+  // Обработка ошибок
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Server error' });
 });
 
+// Простой маршрут для проверки статуса API
+app.get('/api/status', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV
+  });
+});
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -127,20 +141,3 @@ process.on('SIGINT', () => {
   });
 });
 
-// Обслуживание статических файлов React в production
-if (process.env.NODE_ENV === 'production') {
-  // Указываем Express раздавать файлы из папки build клиента
-  app.use(express.static(path.join(__dirname, '../client/build')));
-  
-  // Для любых запросов, не относящихся к API, возвращаем React-приложение
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-  });
-}
-else {
-  // Обработка ошибок
-  app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Server error' });
-  });
-}
