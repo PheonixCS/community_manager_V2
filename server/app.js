@@ -34,24 +34,20 @@ fs.ensureDirSync(path.resolve(__dirname, config.ytdlp.downloadDir));
 
 const app = express();
 
-// Обслуживание статических файлов React в production
-if (process.env.NODE_ENV === 'production') {
-  // Указываем Express раздавать файлы из папки build клиента
-  app.use(express.static(path.join(__dirname, '../client/build')));
-  
-  // Для любых запросов, не относящихся к API, возвращаем React-приложение
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-  });
-}
+// 1. Middleware - ДОЛЖНЫ БЫТЬ В НАЧАЛЕ
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
-  // Обработка ошибок
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Server error' });
+// Добавим логирование запросов для отладки
+app.use((req, res, next) => {
+  if (req.path !== '/api/status') { // не логируем частые проверки статуса
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  }
+  next();
 });
 
-// Простой маршрут для проверки статуса API
+// 2. Простой маршрут для проверки статуса API
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'OK',
@@ -59,54 +55,45 @@ app.get('/api/status', (req, res) => {
     env: process.env.NODE_ENV
   });
 });
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
-// Роуты API
+// 3. Роуты API
 app.use('/api/tasks', require('./routes/api/tasks'));
 app.use('/api/posts', require('./routes/api/posts'));
-
-// Добавляем новый маршрут для настроек
 app.use('/api/settings', require('./routes/api/settings'));
-
-// Добавляем новый маршрут для шаблонов фильтров
 app.use('/api/filter-templates', require('./routes/api/filterTemplates'));
-
-// Добавляем маршрут для публикации постов
 app.use('/api/publishing', require('./routes/api/publishing'));
-
-// Добавляем маршрут для VK Auth
 app.use('/api/vk-auth', require('./routes/api/vkAuth'));
-
-// API Routes
-app.use('/api/vk', require('./routes/api/vk')); // Add this line
+app.use('/api/vk', require('./routes/api/vk'));
 app.use('/api/publish-tasks', require('./routes/api/publishTasks'));
-
-// Add the media routes
-const mediaRoutes = require('./routes/mediaRoutes');
-app.use('/api/media', mediaRoutes);
-
-// Add the cleanup routes
+app.use('/api/media', require('./routes/mediaRoutes'));
 app.use('/api/cleanup', require('./routes/api/cleanup'));
 
-// Обслуживание статических файлов React в production
-// if (process.env.NODE_ENV === 'production') {
-//   app.use(express.static(path.join(__dirname, '../client/build')));
+// 4. Обслуживание статических файлов React в production - ПОСЛЕ API маршрутов!
+if (process.env.NODE_ENV === 'production') {
+  console.log('Serving static React files from:', path.join(__dirname, '../client/build'));
+  // Указываем Express раздавать файлы из папки build клиента
+  app.use(express.static(path.join(__dirname, '../client/build')));
+  
+  // Для любых запросов, не относящихся к API, возвращаем React-приложение
+  app.get('*', (req, res) => {
+    console.log('Serving React app for route:', req.originalUrl);
+    res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  });
+}
 
-//   app.get('*', (req, res) => {
-//     res.sendFile(path.join(__dirname, '../client/build/index.html'));
-//   });
-// }
-
-
+// 5. Обработка ошибок - ВСЕГДА В КОНЦЕ
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({ error: 'Server error', message: err.message });
+});
 
 // Подключение к MongoDB
+mongoose.set('strictQuery', false); // Убираем предупреждение
 mongoose.connect(config.mongoURI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  directConnection: true
+  directConnection: true,
+  family: 4  // Принудительно использовать IPv4
 })
   .then((connection) => {
     console.log(`MongoDB Connected: ${connection.connection.host}`);
@@ -122,8 +109,8 @@ mongoose.connect(config.mongoURI, {
     
     // Запуск сервера
     const PORT = config.port || 5000;
-    app.listen(PORT, '0.0.0.0', () => { // Добавляем '0.0.0.0' для работы на всех интерфейсах
-      console.log(`Server running on port ${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     });
   })
   .catch(err => {
@@ -140,4 +127,3 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
-
