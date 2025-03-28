@@ -110,9 +110,15 @@ const AppLayout = ({ children }) => {
   };
   
   // Determine if a nav item is active
-  const isActive = (paths) => {
+  // Измените функцию isActive
+  const isActive = (paths, exact = false) => {
     if (!Array.isArray(paths)) paths = [paths];
-    return paths.some(path => location.pathname === path || location.pathname.startsWith(`${path}/`));
+    return paths.some(path => {
+      if (exact) {
+        return location.pathname === path;
+      }
+      return location.pathname === path || location.pathname.startsWith(`${path}/`);
+    });
   };
 
   return (
@@ -253,7 +259,7 @@ const AppLayout = ({ children }) => {
                 button 
                 component={Link} 
                 to="/posting"
-                selected={isActive('/posting')}
+                selected={isActive('/posting', true)}
               >
                 <ListItemIcon>
                   <DashboardIcon />
