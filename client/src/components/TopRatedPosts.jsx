@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Container, Typography, Paper, Table, TableBody, TableCell, 
-  TableContainer, TableHead, TableRow, Button, IconButton,
-  Chip, Pagination, Box, TextField, Grid, FormControl, InputLabel, Select, MenuItem, Tooltip
+  TableContainer, TableHead, TableRow, Button,
+  Chip, Pagination, Box, TextField, Grid, Tooltip
 } from '@mui/material';
 import { 
   Visibility as ViewIcon, 
@@ -29,11 +29,8 @@ const TopRatedPosts = () => {
     minViewRate: ''
   });
 
-  useEffect(() => {
-    fetchTopRatedPosts();
-  }, [page]);
-
-  const fetchTopRatedPosts = async () => {
+  // Wrap fetchTopRatedPosts in useCallback
+  const fetchTopRatedPosts = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get('/api/posts/top-rated', {
@@ -51,7 +48,11 @@ const TopRatedPosts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, filters]); // Add the missing dependencies
+
+  useEffect(() => {
+    fetchTopRatedPosts();
+  }, [fetchTopRatedPosts]);
 
   const handlePageChange = (event, value) => {
     setPage(value);

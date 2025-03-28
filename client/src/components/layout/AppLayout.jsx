@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Box, Drawer, AppBar, Toolbar, Typography, Divider, IconButton,
-  List, ListItem, ListItemIcon, ListItemText, Tooltip,
-  ListSubheader, Switch, FormControlLabel, Menu, MenuItem
+  List, ListItem, ListItemIcon, ListItemText,
+  ListSubheader, Switch, FormControlLabel,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -14,8 +14,6 @@ import {
   Settings as SettingsIcon,
   FilterList as FilterIcon,
   TrendingUp as TrendingUpIcon,
-  RadioButtonChecked as ScrapingIcon,
-  Send as PostingIcon,
   ChevronLeft as ChevronLeftIcon,
   AssignmentTurnedIn as PublishTasksIcon,
   History as HistoryIcon,

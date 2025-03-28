@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container, Typography, Paper, Box, Button, CircularProgress,
   TextField, Grid, FormControl, InputLabel, Select, MenuItem,
@@ -7,11 +7,8 @@ import {
 } from '@mui/material';
 import {
   Publish as PublishIcon,
-  Search as SearchIcon,
   Send as SendIcon,
   Refresh as RefreshIcon,
-  Share as ShareIcon,
-  ContentPaste as ContentIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -66,7 +63,6 @@ const ManualPublishing = () => {
   const [selectedPostId, setSelectedPostId] = useState('');
   const [targetGroups, setTargetGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
-  const [postLoading, setPostLoading] = useState(false);
   const [postsLoading, setPostsLoading] = useState(false);
   const [groupsLoading, setGroupsLoading] = useState(false);
   
@@ -93,47 +89,9 @@ const ManualPublishing = () => {
   
   // Add state for error tracking
   const [groupError, setGroupError] = useState(null);
-  const [postError, setPostError] = useState(null);
   
-  useEffect(() => {
-    // Check authentication status
-    checkAuthStatus();
-    
-    // Load initial data
-    fetchGroups();
-    fetchGenerators();
-  }, []);
-  
-  // When tab changes, clear form and fetch appropriate data
-  useEffect(() => {
-    if (tabValue === 0) {
-      fetchTopPosts();
-    } else {
-      setSelectedPostId('');
-    }
-  }, [tabValue]);
-  
-  // When generator changes, update params
-  useEffect(() => {
-    if (selectedGenerator) {
-      const generator = generators.find(g => g.id === selectedGenerator);
-      if (generator) {
-        setGeneratorMetadata(generator);
-        
-        // Initialize params with default values
-        const initialParams = {};
-        generator.params.forEach(param => {
-          initialParams[param.name] = param.defaultValue;
-        });
-        setGeneratorParams(initialParams);
-      }
-    } else {
-      setGeneratorMetadata(null);
-      setGeneratorParams({});
-    }
-  }, [selectedGenerator, generators]);
-  
-  const checkAuthStatus = async () => {
+  // Wrap functions in useCallback to prevent recreation on each render
+  const checkAuthStatus = useCallback(async () => {
     try {
       const response = await axios.get('/api/vk-auth/tokens');
       setAuthStatus({
@@ -165,13 +123,13 @@ const ManualPublishing = () => {
         });
       }
     }
-  };
+  }, []); // Empty dependency array or add dependencies if needed
   
   const isTokenExpired = (expiresAt) => {
     return Math.floor(Date.now() / 1000) >= expiresAt;
   };
   
-  const fetchTopPosts = async () => {
+  const fetchTopPosts = useCallback(async () => {
     setPostsLoading(true);
     try {
       const response = await axios.get('/api/posts', {
@@ -188,9 +146,9 @@ const ManualPublishing = () => {
     } finally {
       setPostsLoading(false);
     }
-  };
+  }, []); // Add showSnackbar to dependencies if needed
   
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     setGroupsLoading(true);
     setGroupError(null);
     
@@ -220,7 +178,7 @@ const ManualPublishing = () => {
     } finally {
       setGroupsLoading(false);
     }  
-  };
+  }, []); // Add dependencies if needed
   
   const fetchGroupsAlternate = async () => {
     try {
@@ -262,7 +220,7 @@ const ManualPublishing = () => {
     }
   };
   
-  const fetchGenerators = async () => {
+  const fetchGenerators = useCallback(async () => {
     setGeneratorLoading(true);
     try {
       const response = await axios.get('/api/publishing/generators');
@@ -273,13 +231,52 @@ const ManualPublishing = () => {
     } finally {
       setGeneratorLoading(false);
     }
-  };
+  }, []); // Add dependencies like showSnackbar if needed
   
   // Add debug output
   useEffect(() => {
     console.log('Target groups state:', targetGroups);
   }, [targetGroups]);
 
+  useEffect(() => {
+    checkAuthStatus();
+    fetchGenerators();
+    fetchGroups();
+  }, [checkAuthStatus, fetchGenerators, fetchGroups]); // Add missing dependencies
+  
+  useEffect(() => {
+    fetchTopPosts();
+  }, [fetchTopPosts]); // Add fetchTopPosts as dependency
+  
+  // When tab changes, clear form and fetch appropriate data
+  useEffect(() => {
+    if (tabValue === 0) {
+      fetchTopPosts();
+    } else {
+      setSelectedPostId('');
+    }
+  }, [tabValue, fetchTopPosts]); // Add fetchTopPosts as a dependency
+  
+  // When generator changes, update params
+  useEffect(() => {
+    if (selectedGenerator) {
+      const generator = generators.find(g => g.id === selectedGenerator);
+      if (generator) {
+        setGeneratorMetadata(generator);
+        
+        // Initialize params with default values
+        const initialParams = {};
+        generator.params.forEach(param => {
+          initialParams[param.name] = param.defaultValue;
+        });
+        setGeneratorParams(initialParams);
+      }
+    } else {
+      setGeneratorMetadata(null);
+      setGeneratorParams({});
+    }
+  }, [selectedGenerator, generators]);
+  
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };

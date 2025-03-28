@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Container, Typography, Box, Grid, Card, CardContent,
-  CardActions, Button, TextField, IconButton, Paper,
+  Container, Typography, Box, Grid,
+  Button, IconButton, Paper,
   List, ListItem, ListItemText, ListItemAvatar, Avatar,
-  ListItemSecondary, Divider, FormControl, InputLabel,
+  Divider, FormControl, InputLabel,
   Select, MenuItem, CircularProgress, Chip, Snackbar, Alert
 } from '@mui/material';
 import {
   Videocam as VideoIcon,
-  Delete as DeleteIcon,
   Download as DownloadIcon,
-  FilterList as FilterIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
 import axios from 'axios';

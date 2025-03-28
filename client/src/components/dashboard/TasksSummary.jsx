@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, Box, Divider, Chip, Stack } from '@mui/material';
+import { Typography, Box, Divider, Stack } from '@mui/material';
 import { CheckCircle as ActiveIcon, Cancel as InactiveIcon } from '@mui/icons-material';
 
 const TasksSummary = ({ tasks }) => {

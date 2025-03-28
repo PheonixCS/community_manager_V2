@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Container, Typography, Paper, Grid, Button,
+  Container, Typography, Grid, Button,
   TextField, Card, CardContent, CardActions,
-  Divider, Box, IconButton, Dialog,
+  Divider, Box, Dialog,
   DialogTitle, DialogContent, DialogActions,
   Alert, Snackbar, FormControlLabel, Switch
 } from '@mui/material';
@@ -20,11 +20,7 @@ const FilterTemplatesPanel = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
-
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     try {
       const response = await axios.get('/api/filter-templates');
       setTemplates(response.data);
@@ -32,7 +28,11 @@ const FilterTemplatesPanel = () => {
       console.error('Error fetching templates:', error);
       showSnackbar('Ошибка при загрузке шаблонов', 'error');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
 
   const handleCreateTemplate = () => {
     setEditingTemplate({

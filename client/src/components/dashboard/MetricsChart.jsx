@@ -25,8 +25,8 @@ const MetricsChart = ({ data }) => {
   }));
 
   // Получаем максимальное значение для настройки оси Y
-  const maxPosts = Math.max(...chartData.map(item => item.posts));
-  const yAxisMax = Math.ceil(maxPosts * 1.1); // Увеличиваем максимум на 10% для отступа
+  // const maxPosts = Math.max(...chartData.map(item => item.posts));
+  // const yAxisMax = Math.ceil(maxPosts * 1.1); // Увеличиваем максимум на 10% для отступа
 
   return (
     <Box>

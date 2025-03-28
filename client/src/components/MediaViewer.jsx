@@ -2,13 +2,10 @@ import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  IconButton,
-  Grid,
-  Card,
+  IconButton,  
   CardMedia,
   Typography,
   Box,
-  CircularProgress,
   Tooltip
 } from '@mui/material';
 import {

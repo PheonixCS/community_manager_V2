@@ -19,7 +19,6 @@ import {
   WebOutlined as DomainIcon
 } from '@mui/icons-material';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
 const TaskList = () => {
   const [tasks, setTasks] = useState([]);
@@ -46,9 +45,8 @@ const TaskList = () => {
   const [communityInput, setCommunityInput] = useState('');
   const [communityType, setCommunityType] = useState('id');
   const [filterTemplates, setFilterTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
   
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
 
   useEffect(() => {
     fetchTasks();

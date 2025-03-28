@@ -1,20 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Container, Typography, Paper, Box, Button, Card, CardContent, CardActions,
-  Grid, TextField, FormControlLabel, Switch, Chip, IconButton, Alert,
-  CircularProgress, Divider, Snackbar, Accordion, AccordionSummary,
-  AccordionDetails, Dialog, DialogTitle, DialogContent, DialogActions,
+  Container, Typography, Paper, Box, Button,
+  Grid, TextField, FormControlLabel, Switch, IconButton, Alert,
+  CircularProgress, Divider, Snackbar,
   List, ListItem, ListItemText, ListItemSecondaryAction
 } from '@mui/material';
 import {
-  ExpandMore as ExpandMoreIcon,
-  Add as AddIcon,
   PlayArrow as TestIcon,
-  Save as SaveIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
-  Close as CloseIcon,
-  Code as CodeIcon,
   ContentPaste as ContentIcon
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -32,11 +25,8 @@ const ContentGeneratorManager = () => {
     severity: 'info'
   });
 
-  useEffect(() => {
-    fetchGenerators();
-  }, []);
-
-  const fetchGenerators = async () => {
+  // Wrap fetchGenerators in useCallback
+  const fetchGenerators = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.get('/api/publishing/generators');
@@ -47,7 +37,11 @@ const ContentGeneratorManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Add showSnackbar to dependencies if it's defined in the component
+
+  useEffect(() => {
+    fetchGenerators();
+  }, [fetchGenerators]);
 
   const handleSelectGenerator = (generator) => {
     setSelectedGenerator(generator);

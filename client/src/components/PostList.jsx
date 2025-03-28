@@ -1,22 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Container, Typography, Box, Grid, Card, CardContent,
-  CardActions, Button, TextField, MenuItem, IconButton,
-  Pagination, Chip, Divider, Paper, Select, FormControl,
-  InputLabel, Slider, Stack, CardMedia, Link, CircularProgress,
+  Container, Typography, Box, Grid,
+  Button, TextField, MenuItem, Pagination, Paper, Select, FormControl,
+  InputLabel, CircularProgress,
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
   Snackbar, Alert, Tooltip, TableContainer, Table, TableHead, TableRow, TableCell, TableSortLabel, TableBody
 } from '@mui/material';
 import {
   Favorite as LikeIcon,
-  ChatBubble as CommentIcon,
   Share as RepostIcon,
   Visibility as ViewIcon,
-  OpenInNew as ExternalLinkIcon,
   FilterList as FilterIcon,
   Delete as DeleteIcon,
-  Download as DownloadIcon,
-  VideoLibrary as VideoIcon,
   DateRange as DateIcon,
   TextFields as TextIcon,
   Tag as IdIcon,
@@ -29,7 +24,7 @@ const PostList = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(20);
   const [totalPosts, setTotalPosts] = useState(0);
   const [filters, setFilters] = useState({
     communityId: '',
@@ -41,15 +36,10 @@ const PostList = () => {
   });
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [videoDownloadStatus, setVideoDownloadStatus] = useState({});
   const [sortField, setSortField] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc'); // Добавляем состояние для порядка сортировки
 
-  useEffect(() => {
-    fetchPosts();
-  }, [page, limit, filters]);
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.get('/api/posts', {
@@ -75,7 +65,11 @@ const PostList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, filters]);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
 
   const handlePageChange = (event, value) => {
     setPage(value);
@@ -105,22 +99,6 @@ const PostList = () => {
     return date.toLocaleString();
   };
 
-  const getAttachmentPreview = (post) => {
-    if (post.attachments && post.attachments.length > 0) {
-      const attachment = post.attachments[0];
-      if (attachment.type === 'photo') {
-        return attachment.photo.sizes[0].url;
-      }
-    }
-    return null;
-  };
-
-  const getVkPostUrl = (postId) => {
-    const [communityId, postIdPart] = postId.split('_');
-    
-    return `https://vk.com/wall${communityId}_${postIdPart}`;
-  };
-
   const handleClearAllPosts = async () => {
     setConfirmDialogOpen(false);
     try {
@@ -146,88 +124,11 @@ const PostList = () => {
     }
   };
 
-  const handleDownloadVideos = async (postId) => {
-    try {
-      setVideoDownloadStatus({
-        ...videoDownloadStatus,
-        [postId]: 'loading'
-      });
-      
-      const response = await axios.post(`/api/posts/${postId}/download-videos`);
-      
-      setVideoDownloadStatus({
-        ...videoDownloadStatus,
-        [postId]: 'success'
-      });
-      
-      if (response.data.status === 'no_videos') {
-        setSnackbar({
-          open: true,
-          message: 'В посте нет видео для скачивания',
-          severity: 'info'
-        });
-      } else {
-        const successCount = response.data.results?.filter(r => r.status === 'success').length || 0;
-        const alreadyDownloaded = response.data.results?.filter(r => r.status === 'already_downloaded').length || 0;
-        const errorCount = response.data.results?.filter(r => r.status === 'error').length || 0;
-        
-        let message = `Видео обработаны: ${successCount} скачано`;
-        if (alreadyDownloaded > 0) message += `, ${alreadyDownloaded} уже было скачано ранее`;
-        if (errorCount > 0) message += `, ${errorCount} с ошибками`;
-        
-        setSnackbar({
-          open: true,
-          message,
-          severity: successCount > 0 ? 'success' : 'info'
-        });
-      }
-    } catch (error) {
-      console.error(`Error downloading videos from post ${postId}:`, error);
-      setVideoDownloadStatus({
-        ...videoDownloadStatus,
-        [postId]: 'error'
-      });
-      setSnackbar({
-        open: true,
-        message: `Ошибка при скачивании видео: ${error.response?.data?.error || error.message}`,
-        severity: 'error'
-      });
-    }
-  };
-
   const handleCloseSnackbar = () => {
     setSnackbar({
       ...snackbar,
       open: false
     });
-  };
-
-  const getVideoDownloadButton = (post) => {
-    const status = videoDownloadStatus[post._id];
-    
-    // Проверяем, есть ли в посте видео-вложения
-    const hasVideo = post.attachments && post.attachments.some(
-      attachment => attachment.type === 'video'
-    );
-    
-    if (!hasVideo) return null;
-    
-    return (
-      <Tooltip title="Скачать видео">
-        <IconButton
-          size="small"
-          color="primary"
-          onClick={() => handleDownloadVideos(post._id)}
-          disabled={status === 'loading'}
-        >
-          {status === 'loading' ? (
-            <CircularProgress size={20} />
-          ) : (
-            <VideoIcon />
-          )}
-        </IconButton>
-      </Tooltip>
-    );
   };
 
   const handleSortChange = (field) => {

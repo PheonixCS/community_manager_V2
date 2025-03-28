@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container, Typography, Paper, Box, Button, Chip, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  FormControl, InputLabel, Select, MenuItem, TextField, Grid, Tooltip,
-  Switch, FormControlLabel, CircularProgress, Alert, Snackbar
+  FormControl, InputLabel, Select, MenuItem, Grid, Tooltip,
+  CircularProgress, Alert, Snackbar
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -20,7 +20,7 @@ import {
   Refresh as RefreshIcon
 } from '@mui/icons-material';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 const PublishTaskList = () => {
   const [tasks, setTasks] = useState([]);
@@ -37,13 +37,20 @@ const PublishTaskList = () => {
     severity: 'info'
   });
   
-  const navigate = useNavigate();
+  // Remove navigate if not used, or use it somewhere
+  // const navigate = useNavigate(); 
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const fetchTasks = async () => {
+  // Define showSnackbar first with useCallback
+  const showSnackbar = useCallback((message, severity = 'info') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  }, []); // No dependencies since it just uses setState
+  
+  // Now define fetchTasks after showSnackbar
+  const fetchTasks = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
@@ -58,7 +65,11 @@ const PublishTaskList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, showSnackbar]); // Add showSnackbar as dependency
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
   const handleFilterChange = (e) => {
     setFilter({
@@ -162,14 +173,6 @@ const PublishTaskList = () => {
       
       showSnackbar('Ошибка при выполнении задачи', 'error');
     }
-  };
-
-  const showSnackbar = (message, severity = 'info') => {
-    setSnackbar({
-      open: true,
-      message,
-      severity
-    });
   };
 
   const handleCloseSnackbar = () => {

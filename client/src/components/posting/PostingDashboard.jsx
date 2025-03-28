@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container, Typography, Grid, Paper, Box, Button,
   List, ListItem, ListItemText, Divider, Card, CardContent,
@@ -15,7 +15,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, ResponsiveContainer, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
 
 const PostingDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -24,11 +24,8 @@ const PostingDashboard = () => {
   const [recentHistory, setRecentHistory] = useState([]);
   const [authStatus, setAuthStatus] = useState({ hasActiveToken: false, error: null });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  // Wrap fetchData in useCallback
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       // Parallelize API calls
@@ -66,7 +63,11 @@ const PostingDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Add dependencies if needed
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]); // Add fetchData as dependency
 
   // Remove the redundant isTokenExpired function since we're doing the check inline
 

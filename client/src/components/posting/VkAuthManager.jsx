@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container, Typography, Paper, Box, Button, Chip, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -27,7 +27,6 @@ import {
 const VkAuthManager = () => {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [authUrl, setAuthUrl] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tokenToDelete, setTokenToDelete] = useState(null);
   const [snackbar, setSnackbar] = useState({
@@ -37,6 +36,20 @@ const VkAuthManager = () => {
   });
   const [tokenActions, setTokenActions] = useState({});
   const [pkceError, setPkceError] = useState(null);
+
+  // Wrap fetchTokens in useCallback
+  const fetchTokens = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get('/api/vk-auth/tokens');
+      setTokens(response.data);
+    } catch (error) {
+      console.error('Error fetching tokens:', error);
+      showSnackbar('Ошибка при загрузке токенов', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, []); // Add showSnackbar to dependencies if needed
 
   useEffect(() => {
     const initData = async () => {
@@ -51,20 +64,11 @@ const VkAuthManager = () => {
     };
     
     initData();
-  }, []);
+  }, [fetchTokens]);
 
-  const fetchTokens = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get('/api/vk-auth/tokens');
-      setTokens(response.data);
-    } catch (error) {
-      console.error('Error fetching tokens:', error);
-      showSnackbar('Ошибка при загрузке токенов', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    fetchTokens();
+  }, [fetchTokens]); // Add fetchTokens as dependency
 
   // Helper function to correctly parse the scope from any format
   const parseScopes = (scope) => {

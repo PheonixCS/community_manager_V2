@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container, Typography, Paper, Box, Button, Chip, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
   FormControl, InputLabel, Select, MenuItem, TextField, Grid, Tooltip,
   Pagination, CircularProgress, Alert, Snackbar
 } from '@mui/material';
@@ -38,12 +37,15 @@ const PublishHistoryList = () => {
     severity: 'info'
   });
 
-  useEffect(() => {
-    fetchHistory();
-    fetchPublishTasks();
-  }, [page, limit]);
+  const showSnackbar = useCallback((message, severity = 'info') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  }, []); // No dependencies needed as it just uses setState
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
@@ -61,16 +63,21 @@ const PublishHistoryList = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchPublishTasks = async () => {
+  }, [page, limit, filter, showSnackbar]); // Now showSnackbar is stable
+  
+  const fetchPublishTasks = useCallback(async () => {
     try {
       const response = await axios.get('/api/publishing/tasks');
       setPublishTasks(response.data.data || []);
     } catch (error) {
       console.error('Error fetching publish tasks:', error);
     }
-  };
+  }, []); // No dependencies
+
+  useEffect(() => {
+    fetchHistory();
+    fetchPublishTasks();
+  }, [page, limit, fetchPublishTasks, fetchHistory]);
 
   const handlePageChange = (event, value) => {
     setPage(value);
@@ -94,14 +101,6 @@ const PublishHistoryList = () => {
       dateTo: '',
       targetGroupId: '',
       taskId: ''
-    });
-  };
-
-  const showSnackbar = (message, severity = 'info') => {
-    setSnackbar({
-      open: true,
-      message,
-      severity
     });
   };
 
@@ -144,6 +143,11 @@ const PublishHistoryList = () => {
     
     const task = publishTasks.find(t => t._id === taskId);
     return task ? task.name : `Задача ID: ${taskId}`;
+  };
+
+  const handleLimitChange = (event) => {
+    setLimit(parseInt(event.target.value, 10));
+    setPage(1);  // Reset to first page when changing limit
   };
 
   return (
@@ -340,7 +344,20 @@ const PublishHistoryList = () => {
                 </Table>
               </TableContainer>
               
-              <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 2, gap: 2, alignItems: 'center' }}>
+                <FormControl variant="outlined" size="small">
+                  <Select
+                    value={limit}
+                    onChange={handleLimitChange}
+                    displayEmpty
+                  >
+                    <MenuItem value={10}>10 записей</MenuItem>
+                    <MenuItem value={20}>20 записей</MenuItem>
+                    <MenuItem value={50}>50 записей</MenuItem>
+                    <MenuItem value={100}>100 записей</MenuItem>
+                  </Select>
+                </FormControl>
+                
                 <Pagination
                   count={Math.ceil(total / limit)}
                   page={page}

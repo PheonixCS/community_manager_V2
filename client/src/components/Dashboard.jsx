@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Grid, Paper, Typography, Box, CircularProgress, List, ListItem, ListItemText, Button } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import TasksSummary from './dashboard/TasksSummary';
@@ -10,7 +9,6 @@ import MetricsChart from './dashboard/MetricsChart';
 import CommunityDistribution from './dashboard/CommunityDistribution';
 
 const Dashboard = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);

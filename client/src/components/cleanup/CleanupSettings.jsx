@@ -1,25 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Container, Typography, Paper, Box, Divider, Grid, TextField, Switch,
+  Container, Typography, Paper, Box, Grid, TextField, Switch,
   FormControlLabel, Button, Alert, Snackbar, CircularProgress,
-  Card, CardContent, CardHeader, Slider, Chip, IconButton,
+  Card, CardContent, CardHeader, Slider, Chip,
   FormControl, InputLabel, Select, MenuItem, ListItemText, Checkbox,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Tooltip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
+  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
 } from '@mui/material';
 import {
-  DeleteForever as DeleteIcon,
   ScheduleOutlined as ScheduleIcon,
   PlayArrow as RunIcon,
   Save as SaveIcon, 
   Refresh as RefreshIcon,
   BarChart as StatsIcon,
   Settings as SettingsIcon,
-  Info as InfoIcon
 } from '@mui/icons-material';
 import axios from 'axios';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, TimePicker } from '@mui/x-date-pickers';
 
 const CleanupSettings = () => {
   // State for settings
@@ -29,17 +25,14 @@ const CleanupSettings = () => {
   const [saveLoading, setSaveLoading] = useState(false);
   const [runLoading, setRunLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [communities, setCommunities] = useState([]);
+  // Add a dummy empty array to replace the removed state variable
+  const communities = [];
   const [confirmRunDialogOpen, setConfirmRunDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [showCronHelp, setShowCronHelp] = useState(false);
   
-  useEffect(() => {
-    fetchSettings();
-    fetchCommunities();
-  }, []);
-
-  const fetchSettings = async () => {
+  // Wrap fetchSettings in useCallback
+  const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get('/api/cleanup/settings');
@@ -51,25 +44,17 @@ const CleanupSettings = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchCommunities = async () => {
-    try {
-      // Retrieve unique community IDs from posts
-      const response = await axios.get('/api/posts/stats/overview');
-      
-      if (response.data && response.data.communityCounts) {
-        const communitiesList = response.data.communityCounts.map(community => ({
-          id: community._id,
-          count: community.count
-        }));
-        setCommunities(communitiesList);
-      }
-    } catch (error) {
-      console.error('Error fetching communities:', error);
-    }
-  };
-
+  }, []);  // Add showSnackbar to dependencies if needed
+  
+  // Either use fetchCommunities or remove it
+  // const fetchCommunities = async () => {
+  //   // Implementation or remove
+  // };
+  
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+  
   const handleSaveSettings = async () => {
     try {
       setSaveLoading(true);

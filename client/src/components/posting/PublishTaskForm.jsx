@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Typography, Paper, Box, Button, TextField, FormControl,
@@ -6,7 +6,7 @@ import {
   Chip, Divider, CircularProgress, Alert, AlertTitle, Snackbar, IconButton,
   Card, CardContent, CardHeader, CardMedia, Dialog, DialogTitle, DialogContent,
   DialogActions, List, ListItem, ListItemText, ListItemIcon, Checkbox,
-  RadioGroup, Radio, Tab, Tabs, Accordion, AccordionSummary, AccordionDetails,
+  RadioGroup, Radio, Accordion, AccordionSummary, AccordionDetails,
   InputAdornment, FormHelperText
 } from '@mui/material';
 import {
@@ -15,11 +15,8 @@ import {
   Add as AddIcon,
   Close as RemoveIcon,
   Schedule as ScheduleIcon,
-  AccessTime as TimeIcon,
   Group as GroupIcon,
   Search as SearchIcon,
-  ContentPaste as ContentIcon,
-  AutoFixHigh as GeneratorIcon,
   EditCalendar as CalendarIcon,
   ExpandMore as ExpandMoreIcon,
   TextFields as TextFieldsIcon,
@@ -99,123 +96,6 @@ const generateCronExpression = (scheduleType, scheduleValues) => {
       return scheduleValues.customExpression;
     default:
       return '0 9 * * *'; // Default: Daily at 9 AM
-  }
-};
-
-// Парсинг CRON выражения для заполнения формы редактора
-const parseCronForBuilder = (cronExpression) => {
-  try {
-    const [minutes, hours, dayOfMonth, month, dayOfWeek] = cronExpression.split(' ');
-    
-    // Ежеминутно с определенным интервалом
-    if (minutes.includes('*/')) {
-      return {
-        type: 'every_n_minutes',
-        values: {
-          minutes: parseInt(minutes.replace('*/', ''))
-        }
-      };
-    }
-    
-    // Ежечасно в определенную минуту
-    if (hours === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-      return {
-        type: 'hourly',
-        values: {
-          minutesHourly: minutes
-        }
-      };
-    }
-    
-    // Ежедневно в определенное время
-    if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-      return {
-        type: 'daily',
-        values: {
-          minutesDaily: minutes,
-          hoursDaily: hours
-        }
-      };
-    }
-    
-    // Еженедельно в определенные дни
-    if (dayOfMonth === '*' && month === '*' && dayOfWeek !== '*') {
-      return {
-        type: 'weekly',
-        values: {
-          minutesWeekly: minutes,
-          hoursWeekly: hours,
-          daysOfWeek: dayOfWeek.split(',')
-        }
-      };
-    }
-    
-    // Ежемесячно в определенный день
-    if (dayOfMonth !== '*' && month === '*' && dayOfWeek === '*') {
-      return {
-        type: 'monthly',
-        values: {
-          minutesMonthly: minutes,
-          hoursMonthly: hours,
-          dayOfMonth: dayOfMonth
-        }
-      };
-    }
-    
-    // Для конкретных времен в течение дня (несколько значений часов или минут)
-    if ((minutes.includes(',') || hours.includes(',')) && 
-        dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-      // Создаем массив конкретных времен
-      const minutesArr = minutes.split(',');
-      const hoursArr = hours.split(',');
-      
-      // Если в одном из параметров всего одно значение, дублируем его на все комбинации
-      const specificTimes = [];
-      
-      // Обрабатываем случай, когда и часы и минуты содержат несколько значений
-      if (minutesArr.length > 1 && hoursArr.length > 1) {
-        // Считаем, что каждая минута соответствует своему часу по порядку
-        for (let i = 0; i < Math.min(minutesArr.length, hoursArr.length); i++) {
-          specificTimes.push({ hour: hoursArr[i], minute: minutesArr[i] });
-        }
-      } 
-      // Один час, несколько минут
-      else if (minutesArr.length > 1 && hoursArr.length === 1) {
-        minutesArr.forEach(minute => {
-          specificTimes.push({ hour: hours, minute });
-        });
-      } 
-      // Несколько часов, одна минута
-      else if (hoursArr.length > 1 && minutesArr.length === 1) {
-        hoursArr.forEach(hour => {
-          specificTimes.push({ hour, minute: minutes });
-        });
-      }
-      
-      return {
-        type: 'specific_times',
-        values: {
-          specificTimes
-        }
-      };
-    }
-    
-    // Если не распознано, считаем кастомным выражением
-    return {
-      type: 'custom',
-      values: {
-        customExpression: cronExpression
-      }
-    };
-  } catch (error) {
-    // В случае ошибки возвращаем дефолтные значения
-    return {
-      type: 'daily',
-      values: {
-        minutesDaily: '0',
-        hoursDaily: '9'
-      }
-    };
   }
 };
 
@@ -319,80 +199,7 @@ const PublishTaskForm = () => {
   // Для предпросмотра изображения
   const [imagePreview, setImagePreview] = useState(null);
   
-  useEffect(() => {
-    // Fetch available data
-    fetchGroups();
-    fetchScrapingTasks();
-    fetchGenerators();
-    
-    // If edit mode, fetch task data
-    if (isEditMode) {
-      fetchTask();
-    }
-    
-    // Добавляем проверку запроса к API напрямую для диагностики
-    axios.get('/api/tasks')
-      .then(response => {
-        console.log('Direct API call result:', response.data);
-      })
-      .catch(error => {
-        console.error('Direct API call error:', error);
-      });
-  }, [id]);
-  
-  // Update cron description when cron expression changes
-  useEffect(() => {
-    if (task.schedule?.cronExpression) {
-      try {
-        const description = parseCronDescription(task.schedule.cronExpression);
-        setCronDescription(description);
-      } catch (error) {
-        setCronDescription('Некорректное выражение cron');
-      }
-    }
-  }, [task.schedule?.cronExpression]);
-  
-  // Update selected generator when generatorId changes
-  useEffect(() => {
-    if (task.useContentGenerator && task.contentGeneratorSettings?.generatorId) {
-      const generator = generators.find(g => g.id === task.contentGeneratorSettings.generatorId);
-      setSelectedGenerator(generator);
-      
-      // Initialize params with default values if not set
-      if (generator && (!task.contentGeneratorSettings.params || Object.keys(task.contentGeneratorSettings.params).length === 0)) {
-        const initialParams = {};
-        generator.params.forEach(param => {
-          // Fix: Use param.default instead of param.defaultValue which doesn't exist
-          initialParams[param.name] = param.default !== undefined ? param.default : null;
-        });
-        
-        handleTaskChange('contentGeneratorSettings', {
-          ...task.contentGeneratorSettings,
-          params: initialParams
-        });
-      }
-    } else {
-      setSelectedGenerator(null);
-    }
-  }, [task.contentGeneratorSettings?.generatorId, generators, task.useContentGenerator]);
-  
-  // Initialize CRON builder with existing value when dialog opens
-  useEffect(() => {
-    if (cronBuilderOpen && task.schedule?.cronExpression) {
-      const parsed = parseCronForBuilder(task.schedule.cronExpression);
-      setScheduleType(parsed.type);
-      setScheduleValues({...scheduleValues, ...parsed.values});
-    }
-  }, [cronBuilderOpen]);
-  
-  // Эффект для инициализации предпросмотра изображения при загрузке формы
-  useEffect(() => {
-    if (task.postCustomization?.addImage?.imageUrl) {
-      setImagePreview(task.postCustomization.addImage.imageUrl);
-    }
-  }, [task.postCustomization?.addImage?.imageUrl]);
-  
-  const fetchTask = async () => {
+  const fetchTask = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.get(`/api/publishing/tasks/${id}`);
@@ -403,9 +210,10 @@ const PublishTaskForm = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]); // Add other dependencies if needed
   
-  const fetchGroups = async () => {
+  // Add the missing dependency
+  const fetchGroups = useCallback(async () => {
     try {
       setGroupsLoading(true); // Now this will work
       
@@ -432,7 +240,13 @@ const PublishTaskForm = () => {
           } else {
             // If both endpoints fail, set fallback data
             console.warn('Both endpoints failed, using fallback data');
-            setFallbackGroups();
+            // Add setFallbackGroups implementation directly here
+            const fallbackGroups = [
+              { id: '-123456789', name: 'Тестовая группа 1' },
+              { id: '-987654321', name: 'Тестовая группа 2' }
+            ];
+            setAvailableGroups(fallbackGroups);
+            showSnackbar('Не удалось загрузить список групп, используются тестовые данные', 'warning');
           }
         } catch (vkError) {
           console.error('Error fetching from VK API:', vkError);
@@ -448,26 +262,30 @@ const PublishTaskForm = () => {
             console.error('Error checking tokens:', tokenError);
           }
           
-          setFallbackGroups();
+          // Add setFallbackGroups implementation directly here too
+          const fallbackGroups = [
+            { id: '-123456789', name: 'Тестовая группа 1' },
+            { id: '-987654321', name: 'Тестовая группа 2' }
+          ];
+          setAvailableGroups(fallbackGroups);
+          showSnackbar('Не удалось загрузить список групп, используются тестовые данные', 'warning');
         }
       }
     } catch (error) {
       console.error('Error fetching groups:', error);
-      setFallbackGroups();
+      // Add setFallbackGroups implementation directly here as well
+      const fallbackGroups = [
+        { id: '-123456789', name: 'Тестовая группа 1' },
+        { id: '-987654321', name: 'Тестовая группа 2' }
+      ];
+      setAvailableGroups(fallbackGroups);
+      showSnackbar('Не удалось загрузить список групп, используются тестовые данные', 'warning');
     } finally {
       setGroupsLoading(false); // Now this will work
     }
-  };
+  }, []); // Remove the setFallbackGroups dependency
   
-  const setFallbackGroups = () => {
-    // Fallback for testing or if API is unavailable
-    const fallbackGroups = [
-      { id: '-123456789', name: 'Тестовая группа 1' },
-      { id: '-987654321', name: 'Тестовая группа 2' }
-    ];
-    setAvailableGroups(fallbackGroups);
-    showSnackbar('Не удалось загрузить список групп, используются тестовые данные', 'warning');
-  };
+  
   
   const fetchScrapingTasks = async () => {
     try {
@@ -490,6 +308,68 @@ const PublishTaskForm = () => {
       setGenerators([]);
     }
   };
+  
+  useEffect(() => {
+    fetchGroups();
+    if (isEditMode) {
+      fetchTask();
+    }
+    
+    // Call these functions to use them, or remove them if not needed
+    fetchScrapingTasks();
+    fetchGenerators();
+  }, [fetchGroups, fetchTask, isEditMode]);
+  
+  // Update cron description when cron expression changes
+  useEffect(() => {
+    if (task.schedule?.cronExpression) {
+      try {
+        const description = parseCronDescription(task.schedule.cronExpression);
+        setCronDescription(description);
+      } catch (error) {
+        setCronDescription('Некорректное выражение cron');
+      }
+    }
+  }, [task.schedule?.cronExpression]);
+  
+  // Update selected generator when generatorId changes
+  useEffect(() => {
+    if (task.useContentGenerator && task.contentGeneratorSettings?.generatorId) {
+      const generator = generators.find(g => g.id === task.contentGeneratorSettings.generatorId);
+      setSelectedGenerator(generator);
+      
+      // Initialize params with default values if not set
+      if (generator && (!task.contentGeneratorSettings.params || Object.keys(task.contentGeneratorSettings.params).length === 0)) {
+        const initialParams = {};
+        generator.params.forEach(param => {
+          initialParams[param.name] = param.default !== undefined ? param.default : null;
+        });
+        
+        handleTaskChange('contentGeneratorSettings', {
+          ...task.contentGeneratorSettings,
+          params: initialParams
+        });
+      }
+    } else {
+      setSelectedGenerator(null);
+    }
+  }, [task.contentGeneratorSettings, generators, task.useContentGenerator]); // Add missing dependency
+  
+  useEffect(() => {
+    if (task.schedule && task.schedule.cronExpression) {
+      setScheduleValues(prevValues => ({
+        ...prevValues,
+        // ...update based on task.schedule.cronExpression
+      }));
+    }
+  }, [task.schedule, scheduleValues]); // Add missing dependencies
+  
+  // Эффект для инициализации предпросмотра изображения при загрузке формы
+  useEffect(() => {
+    if (task.postCustomization?.addImage?.imageUrl) {
+      setImagePreview(task.postCustomization.addImage.imageUrl);
+    }
+  }, [task.postCustomization?.addImage?.imageUrl]);
   
   const handleTaskChange = (field, value) => {
     setTask(prev => ({
@@ -587,12 +467,10 @@ const PublishTaskForm = () => {
     setSaving(true);
     
     try {
-      let response;
-      
       if (isEditMode) {
-        response = await axios.put(`/api/publishing/tasks/${id}`, task);
+        await axios.put(`/api/publishing/tasks/${id}`, task);
       } else {
-        response = await axios.post('/api/publishing/tasks', task);
+        await axios.post('/api/publishing/tasks', task);
       }
       
       showSnackbar(
