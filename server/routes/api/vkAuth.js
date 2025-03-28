@@ -92,7 +92,7 @@ router.get('/groups', async (req, res) => {
       
       // If we have stored groups in settings, return them immediately
       if (settings?.vkGroups && Array.isArray(settings.vkGroups) && settings.vkGroups.length > 0) {
-        console.log('Returning groups from settings cache:', settings.vkGroups.length);
+        // console.log('Returning groups from settings cache:', settings.vkGroups.length);
         
         // Return both the formatted array and as a VK API-like response
         return res.json({
@@ -168,7 +168,7 @@ router.get('/groups', async (req, res) => {
       const settings = await Settings.findOne({});
       
       if (settings?.vkGroups && Array.isArray(settings.vkGroups) && settings.vkGroups.length > 0) {
-        console.log('Returning groups from settings as fallback:', settings.vkGroups.length);
+        // console.log('Returning groups from settings as fallback:', settings.vkGroups.length);
         
         return res.json({
           response: {

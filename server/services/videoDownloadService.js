@@ -23,7 +23,7 @@ class VideoDownloadService {
         const settings = await Settings.findOne() || await Settings.create({});
         
         const ytdlpPath = path.resolve(config.ytdlp.path);
-        console.log('Using yt-dlp path:', ytdlpPath);
+        // console.log('Using yt-dlp path:', ytdlpPath);
 
         // Создаём временную директорию, если её нет
         const tempDir = path.join(this.downloadDir, 'temp');
@@ -44,7 +44,7 @@ class VideoDownloadService {
 
         ytdlpProcess.stdout.on('data', (data) => {
           stdoutData += data.toString();
-          console.log(`yt-dlp stdout: ${data}`);
+          // console.log(`yt-dlp stdout: ${data}`);
         });
 
         ytdlpProcess.stderr.on('data', (data) => {
@@ -55,7 +55,7 @@ class VideoDownloadService {
         ytdlpProcess.on('close', async (code) => {
           if (code === 0) {
             try {
-              console.log(`Video downloaded to temp: ${tempFilePath}`);
+              // console.log(`Video downloaded to temp: ${tempFilePath}`);
               
               // Загружаем файл в S3 с унифицированным путём
               const s3Result = await s3Service.uploadFromBuffer(
@@ -109,7 +109,7 @@ class VideoDownloadService {
     return new Promise((resolve, reject) => {
       // Используем абсолютный путь к yt-dlp.exe
       const ytdlpPath = path.resolve(config.ytdlp.path);
-      console.log('Using yt-dlp path:', ytdlpPath);
+      // console.log('Using yt-dlp path:', ytdlpPath);
       
       // Создаем процесс yt-dlp для скачивания видео
       const ytdlpProcess = spawn(ytdlpPath, [
@@ -124,7 +124,7 @@ class VideoDownloadService {
 
       ytdlpProcess.stdout.on('data', (data) => {
         stdoutData += data.toString();
-        console.log(`yt-dlp stdout: ${data}`);
+        // console.log(`yt-dlp stdout: ${data}`);
       });
 
       ytdlpProcess.stderr.on('data', (data) => {
@@ -134,7 +134,7 @@ class VideoDownloadService {
 
       ytdlpProcess.on('close', (code) => {
         if (code === 0) {
-          console.log(`Video downloaded successfully: ${outputPath}`);
+          // console.log(`Video downloaded successfully: ${outputPath}`);
           resolve({
             path: outputPath,
             fileName: path.basename(outputPath)

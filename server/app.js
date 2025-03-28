@@ -41,7 +41,7 @@ app.use((req, res, next) => {
     return next();
   }
   
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  // console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 

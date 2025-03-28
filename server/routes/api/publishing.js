@@ -200,11 +200,11 @@ router.get('/history/post/:postId', async (req, res) => {
 router.get('/generators', async (req, res) => {
   try {
     // Debug log to see if we're reaching this point
-    console.log('GET /api/publishing/generators endpoint called');
+    // console.log('GET /api/publishing/generators endpoint called');
     
     // Get generators from service
     const generators = contentGeneratorService.getAvailableGenerators();
-    console.log(`Retrieved ${generators ? generators.length : 'undefined'} content generators`);
+    // console.log(`Retrieved ${generators ? generators.length : 'undefined'} content generators`);
     
     // Add detailed logging
     if (!generators || generators.length === 0) {
@@ -216,16 +216,16 @@ router.get('/generators', async (req, res) => {
       console.log(`After reload: ${reloadedGenerators ? reloadedGenerators.length : 'undefined'} content generators`);
       
       // If still empty, check what's in the directory
-      const fs = require('fs');
-      const path = require('path');
-      const generatorsDir = path.join(__dirname, '../../services/contentGenerators');
+      // const fs = require('fs');
+      // const path = require('path');
+      // const generatorsDir = path.join(__dirname, '../../services/contentGenerators');
       
-      if (fs.existsSync(generatorsDir)) {
-        const files = fs.readdirSync(generatorsDir);
-        console.log(`Files in generators directory: ${files.join(', ')}`);
-      } else {
-        console.log(`Generators directory does not exist: ${generatorsDir}`);
-      }
+      // if (fs.existsSync(generatorsDir)) {
+      //   const files = fs.readdirSync(generatorsDir);
+      //   console.log(`Files in generators directory: ${files.join(', ')}`);
+      // } else {
+      //   console.log(`Generators directory does not exist: ${generatorsDir}`);
+      // }
       
       return res.json(reloadedGenerators || []);
     }

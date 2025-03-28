@@ -22,8 +22,8 @@ class VkPostingService {
     // Cache the config values for better performance
     this.s3PublicEndpoint = config.s3.publicEndpoint || 'http://krazu-group.tech:9000';
     
-    console.log(`VK Posting Service initialized with API version ${vkApiVersion}`);
-    console.log(`Using S3 public endpoint: ${this.s3PublicEndpoint}`);
+    // console.log`VK Posting Service initialized with API version ${vkApiVersion}`);
+    // console.log`Using S3 public endpoint: ${this.s3PublicEndpoint}`);
   }
 
   /**
@@ -33,7 +33,7 @@ class VkPostingService {
   async getPublishToken() {
     try {
       const requiredScopes = ['wall', 'photos', 'groups', 'manage'];
-      console.log(`Looking for token with these scopes: ${requiredScopes.join(', ')}`);
+      // console.log`Looking for token with these scopes: ${requiredScopes.join(', ')}`);
       
       // Получаем токены через vkAuthService для единообразия
       const allTokens = await vkAuthService.getAllTokens();
@@ -43,17 +43,17 @@ class VkPostingService {
         throw new Error('Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".');
       }
       
-      console.log(`Found ${activeTokens.length} active tokens`);
+      // console.log`Found ${activeTokens.length} active tokens`);
       
       // Ищем токены с правами wall и manage
       for (const token of activeTokens) {
         const tokenScopes = token.scope || [];
-        console.log(`Token ${token.vkUserId} has scopes: ${Array.isArray(tokenScopes) ? tokenScopes.join(', ') : tokenScopes}`);
+        // console.log`Token ${token.vkUserId} has scopes: ${Array.isArray(tokenScopes) ? tokenScopes.join(', ') : tokenScopes}`);
         
         // Проверяем наличие обоих прав: wall и manage
         if ((Array.isArray(tokenScopes) && tokenScopes.includes('wall') && tokenScopes.includes('manage')) ||
             (typeof tokenScopes === 'string' && tokenScopes.includes('wall') && tokenScopes.includes('manage'))) {
-          console.log(`Found token with wall+manage access rights: ${token.vkUserId}`);
+          // console.log`Found token with wall+manage access rights: ${token.vkUserId}`);
           
           // Обновляем дату последнего использования
           token.lastUsed = new Date();
@@ -160,17 +160,17 @@ class VkPostingService {
             // Если количество вложений увеличилось, значит пользователь добавил медиа
             userAddedMedia = post.attachments.length > originalPost.attachments.length;
             if (userAddedMedia) {
-              console.log('User added media to post, will use carousel mode');
+              // console.log'User added media to post, will use carousel mode');
             }
           }
         }
         
         isCarousel = post.isCarousel || userAddedMedia;
-        console.log(`Publishing modified post (isCarousel: ${isCarousel}) to community ${communityId}`);
+        // console.log`Publishing modified post (isCarousel: ${isCarousel}) to community ${communityId}`);
       } else {
         // Передан ID поста - загрузить из базы
         postId = postIdOrData;
-        console.log(`Publishing post with ID ${postId} to community ${communityId}`);
+        // console.log`Publishing post with ID ${postId} to community ${communityId}`);
         
         // Получаем пост из базы данных
         post = await Post.findById(postId);
@@ -182,8 +182,8 @@ class VkPostingService {
         attachments = post.attachments;
         isCarousel = post.isCarousel;
 
-        console.log(`isCarousel: ${isCarousel}`);
-        console.log(`post: ${post._id}`);
+        // console.log`isCarousel: ${isCarousel}`);
+        // console.log`post: ${post._id}`);
         
         // Apply transformations from the options (для обратной совместимости)
         if (options.removeHashtags) {
@@ -284,19 +284,19 @@ class VkPostingService {
   */
   async publishGeneratedPost(content, ownerId, options = {}) {
     try {
-      console.log(`Publishing generated content to ${ownerId}`);
+      // console.log`Publishing generated content to ${ownerId}`);
       // Инициализируем результат
       const generatedAttachments = [];
       const token = options.token.accessToken;
       // Список ключей S3 для последующей очистки
       const s3KeysToClean = [];
-      console.log(`Options for generated post:`, options);
+      // console.log`Options for generated post:`, options);
       // Загружаем фотографии, если они есть и формируем строку вложений
       if (content.attachments && content.attachments.length > 0) {
         const photoAttachments = content.attachments.filter(a => a.type === 'photo');
         
         if (photoAttachments.length > 0) {
-          console.log(`Processing ${photoAttachments.length} photo attachments`);
+          // console.log`Processing ${photoAttachments.length} photo attachments`);
           
           for (const attachment of photoAttachments) {
             if (attachment.url) {
@@ -308,14 +308,14 @@ class VkPostingService {
               try {
                 // Преобразуем локальные URLs в публичные
                 const publicUrl = this.convertLocalUrlToPublic(attachment.url);
-                console.log(`Uploading photo from URL: ${publicUrl}`);
+                // console.log`Uploading photo from URL: ${publicUrl}`);
                 
                 // Загружаем фотографию в ВКонтакте
                 const photoResult = await this.uploadPhotoToVkWithRetry(publicUrl, token, ownerId);
                 
                 if (photoResult) {
                   generatedAttachments.push(photoResult);
-                  console.log(`Successfully uploaded photo: ${photoResult}`);
+                  // console.log`Successfully uploaded photo: ${photoResult}`);
                 }
               } catch (uploadError) {
                 console.error(`Error uploading photo ${attachment.url}:`, uploadError);
@@ -351,7 +351,7 @@ class VkPostingService {
         try {
           // Если это повторная попытка, получаем свежий токен из базы
           if (retryCount > 0) {
-            console.log(`Attempt ${retryCount}/${maxRetries}: Getting fresh token from database`);
+            // console.log`Attempt ${retryCount}/${maxRetries}: Getting fresh token from database`);
             
             // Получаем свежий токен через vkAuthService
             const vkAuthService = require('./vkAuthService');
@@ -363,7 +363,7 @@ class VkPostingService {
             }
             
             token = activeTokens[0].accessToken;
-            console.log(`Using fresh token for retry attempt ${retryCount}`);
+            // console.log`Using fresh token for retry attempt ${retryCount}`);
           }
           
           // Пытаемся опубликовать пост
@@ -382,7 +382,7 @@ class VkPostingService {
           }
           
           // Ждем перед следующей попыткой
-          console.log(`Waiting ${retryDelay}ms before next attempt...`);
+          // console.log`Waiting ${retryDelay}ms before next attempt...`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
@@ -398,7 +398,7 @@ class VkPostingService {
       }
       
       // Успешная публикация
-      console.log(`Successfully posted to wall, post ID: ${result.post_id}`);
+      // console.log`Successfully posted to wall, post ID: ${result.post_id}`);
       result.status = 'success';
       result.postId = result.post_id;
       result.vkUrl = `https://vk.com/wall${ownerId}_${result.post_id}`;
@@ -465,7 +465,7 @@ class VkPostingService {
     // Здесь будем собирать строки для attachments
     const attachmentStrings = [];
     
-    console.log(`Preparing ${attachments.length} attachments for publication, post ID: ${post?._id || 'unknown'}`);
+    // console.log`Preparing ${attachments.length} attachments for publication, post ID: ${post?._id || 'unknown'}`);
     
     // Проверяем наличие скачанных медиа
     const hasDownloadedVideos = post && post.downloadedVideos && post.downloadedVideos.length > 0;
@@ -473,20 +473,20 @@ class VkPostingService {
     
     // Определяем, нужен ли режим карусели для поста
     const isCarousel = post && post.isCarousel;
-    if (isCarousel) {
-      console.log(`Post is marked as carousel. Will use carousel mode for publishing.`);
-    }
+    // if (isCarousel) {
+    //   // console.log`Post is marked as carousel. Will use carousel mode for publishing.`);
+    // }
     
     // Подсчитываем количество изображений для определения необходимости карусели
     const photoAttachments = attachments.filter(a => a.type === 'photo').length;
-    console.log(`Post has ${photoAttachments} photo attachments`);
+    // console.log`Post has ${photoAttachments} photo attachments`);
     
     if (hasDownloadedVideos) {
-      console.log(`Post has ${post.downloadedVideos.length} downloaded videos`);
+      // console.log`Post has ${post.downloadedVideos.length} downloaded videos`);
     }
     
     if (hasMediaDownloads) {
-      console.log(`Post has ${post.mediaDownloads.length} media downloads`);
+      // console.log`Post has ${post.mediaDownloads.length} media downloads`);
     }
     
     // Обрабатываем каждый тип вложений
@@ -507,7 +507,7 @@ class VkPostingService {
             if (photoMedia && photoMedia.s3Url) {
               // Конвертируем локальный URL в публичный для загрузки
               bestPhotoUrl = this.convertLocalUrlToPublic(photoMedia.s3Url);
-              console.log(`Using high quality S3 photo for ID ${photoId}: ${bestPhotoUrl}`);
+              // console.log`Using high quality S3 photo for ID ${photoId}: ${bestPhotoUrl}`);
             }
           }
           
@@ -522,13 +522,13 @@ class VkPostingService {
             });
             
             bestPhotoUrl = sortedSizes[0].url;
-            console.log(`Using best quality VK photo: ${sortedSizes[0].width}x${sortedSizes[0].height}`);
+            // console.log`Using best quality VK photo: ${sortedSizes[0].width}x${sortedSizes[0].height}`);
           }
           
           // 3. Если не нашли лучшее фото, используем старую логику
           if (!bestPhotoUrl) {
             bestPhotoUrl = attachment.url || attachment.photo?.url || attachment.photo?.sizes?.[0]?.url;
-            console.log(`Using fallback photo URL: ${bestPhotoUrl}`);
+            // console.log`Using fallback photo URL: ${bestPhotoUrl}`);
           }
           
           if (bestPhotoUrl) {
@@ -539,7 +539,7 @@ class VkPostingService {
           }
         }
         else if (attachment.type === 'video') {
-          console.log(`Processing video attachment: ${attachment.video?.id || 'unknown'}`);
+          // console.log`Processing video attachment: ${attachment.video?.id || 'unknown'}`);
           
           // Определяем лучший источник видео
           let videoAttachment = null;
@@ -550,11 +550,11 @@ class VkPostingService {
             const downloadedVideo = post.downloadedVideos.find(v => v.videoId === videoId);
             
             if (downloadedVideo && downloadedVideo.s3Url) {
-              console.log(`Found downloaded video in downloadedVideos: ${downloadedVideo.s3Url}`);
+              // console.log`Found downloaded video in downloadedVideos: ${downloadedVideo.s3Url}`);
               
               // Используем оригинальное видео из ВК вместо загрузки своего
               if (attachment.video?.owner_id && attachment.video?.id) {
-                console.log(`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
+                // console.log`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
                 attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
                 continue;
               }
@@ -569,11 +569,11 @@ class VkPostingService {
             );
             
             if (videoMedia && videoMedia.s3Url) {
-              console.log(`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
+              // console.log`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
               
               // Используем оригинальное видео из ВК вместо загрузки своего
               if (attachment.video?.owner_id && attachment.video?.id) {
-                console.log(`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
+                // console.log`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
                 attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
                 continue;
               }
@@ -582,7 +582,7 @@ class VkPostingService {
           
           // 3. Если скачанное видео не нашли или решили не загружать, используем исходное из ВК
           if (attachment.video?.owner_id && attachment.video?.id) {
-            console.log(`Using original VK video: ${attachment.video.owner_id}_${attachment.video.id}`);
+            // console.log`Using original VK video: ${attachment.video.owner_id}_${attachment.video.id}`);
             attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
           }
         }
@@ -623,7 +623,7 @@ class VkPostingService {
         return await this.uploadPhotoToVk(photoUrl, token, communityId);
       } catch (error) {
         lastError = error;
-        console.log(`Photo upload attempt ${attempt + 1}/${retryCount} failed: ${error.message}`);
+        // console.log`Photo upload attempt ${attempt + 1}/${retryCount} failed: ${error.message}`);
         
         // Check if we should retry based on error type
         const shouldRetry = error.message.includes('Too many requests per second') ||
@@ -631,13 +631,13 @@ class VkPostingService {
                             error.response?.status === 500;
         
         if (!shouldRetry) {
-          console.log(`Error doesn't seem retryable, breaking retry loop`);
+          // console.log`Error doesn't seem retryable, breaking retry loop`);
           break;
         }
         
         // Wait before next attempt - use exponential backoff
         const waitTime = retryDelay * Math.pow(2, attempt);
-        console.log(`Waiting ${waitTime}ms before next attempt...`);
+        // console.log`Waiting ${waitTime}ms before next attempt...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
@@ -662,7 +662,7 @@ class VkPostingService {
       
       // Преобразуем локальный URL в публичный, если это URL из S3
       const publicPhotoUrl = this.convertLocalUrlToPublic(photoUrl);
-      console.log(`Attempting to upload photo from URL: ${publicPhotoUrl} to group ${communityId}`);
+      // console.log`Attempting to upload photo from URL: ${publicPhotoUrl} to group ${communityId}`);
       
       // 1. Получаем сервер для загрузки фото
       const uploadServerResponse = await axios.get('https://api.vk.com/method/photos.getWallUploadServer', {
@@ -677,7 +677,7 @@ class VkPostingService {
         throw new Error(`VK API Error: ${uploadServerResponse.data.error.error_msg}`);
       }
       
-      console.log(`Got upload server: ${uploadServerResponse.data.response.upload_url}`);
+      // console.log`Got upload server: ${uploadServerResponse.data.response.upload_url}`);
       const uploadUrl = uploadServerResponse.data.response.upload_url;
       
       // 2. Скачиваем фото
@@ -705,7 +705,7 @@ class VkPostingService {
         throw new Error(`VK Upload Error: ${uploadResponse.data?.error || 'Unknown upload error'}`);
       }
       
-      console.log('Successfully uploaded photo to VK server');
+      // console.log'Successfully uploaded photo to VK server');
       
       // Проверяем наличие необходимых полей в ответе
       if (!uploadResponse.data.photo || uploadResponse.data.photo === 'null' || uploadResponse.data.photo === '') {
@@ -735,8 +735,8 @@ class VkPostingService {
       }
       
       const savedPhoto = saveResponse.data.response[0];
-      console.log(`Saved Photos`)
-      console.log(`Successfully saved photo with ID: ${savedPhoto.id}`);
+      // console.log`Saved Photos`)
+      // console.log`Successfully saved photo with ID: ${savedPhoto.id}`);
       
       return `photo${savedPhoto.owner_id}_${savedPhoto.id}`;
       
@@ -773,13 +773,13 @@ class VkPostingService {
         if (matches && matches[1] && matches[2]) {
           const ownerId = matches[1];
           const videoId = matches[2];
-          console.log(`Using original VK video from URL: ${ownerId}_${videoId}`);
+          // console.log`Using original VK video from URL: ${ownerId}_${videoId}`);
           return `video${ownerId}_${videoId}`;
         }
       }
       
       // Если не удалось извлечь ID из URL, логируем ошибку
-      console.log(`Cannot determine video ID from URL: ${videoUrl}, video may not appear in post`);
+      // console.log`Cannot determine video ID from URL: ${videoUrl}, video may not appear in post`);
       return null;
       
       // Примечание: код ниже не выполнится, так как VK API не принимает загруженные видео в attachments
@@ -830,7 +830,7 @@ class VkPostingService {
     }
     
     // Log problematic URLs for debugging
-    console.log(`Could not convert URL to public format: ${url}`);
+    // console.log`Could not convert URL to public format: ${url}`);
     
     // Если не удалось распознать URL, возвращаем исходный
     return url;
@@ -885,17 +885,17 @@ class VkPostingService {
    */
   async makeWallPostRequest(postData, token) {
     try {
-      console.log('Attempting wall.post request with data:', {
-        owner_id: postData.owner_id,
-        message_preview: postData.message ? postData.message.substring(0, 30) + '...' : '(no text)',
-        has_attachments: !!postData.attachments
-      });
+      // console.log('Attempting wall.post request with data:', {
+      //   owner_id: postData.owner_id,
+      //   message_preview: postData.message ? postData.message.substring(0, 30) + '...' : '(no text)',
+      //   has_attachments: !!postData.attachments
+      // });
       
       // Check if message is very long and truncate temporarily to log
-      if (postData.message && postData.message.length > 1000) {
-        console.log(`Message length is ${postData.message.length} characters (first 100 characters):`);
-        console.log(postData.message.substring(0, 100) + '...');
-      }
+      // if (postData.message && postData.message.length > 1000) {
+      //   console.log(`Message length is ${postData.message.length} characters (first 100 characters):`);
+      //   console.log(postData.message.substring(0, 100) + '...');
+      // }
       
       // Instead of passing everything as URL parameters, create form data for the body
       const formData = new URLSearchParams();
@@ -919,7 +919,7 @@ class VkPostingService {
         (postData._mediaAdded);
         
       if (useCarouselMode) {
-        console.log('Using carousel mode for post publishing');
+        // console.log'Using carousel mode for post publishing');
         formData.append('primary_attachments_mode', 'carousel');
       }
       
@@ -962,7 +962,7 @@ class VkPostingService {
         throw new Error(`VK API Error: ${response.data.error.error_msg}`);
       }
       
-      console.log('Successfully posted to wall, post ID:', response.data.response.post_id);
+      // console.log'Successfully posted to wall, post ID:', response.data.response.post_id);
       return response.data.response;
     } catch (error) {
       console.error('Error making wall.post request:', error);
@@ -987,7 +987,7 @@ class VkPostingService {
    */
   async pinPost(postId, communityId, token) {
     try {
-      console.log(`Pinning post ${postId} in community ${communityId}`);
+      // console.log`Pinning post ${postId} in community ${communityId}`);
       
       const formData = new URLSearchParams();
       formData.append('access_token', token);
@@ -1006,7 +1006,7 @@ class VkPostingService {
         throw new Error(`Error pinning post: ${response.data.error.error_msg}`);
       }
       
-      console.log(`Successfully pinned post ${postId} in community ${communityId}`);
+      // console.log`Successfully pinned post ${postId} in community ${communityId}`);
       return true;
     } catch (error) {
       console.error(`Error pinning post ${postId} in community ${communityId}:`, error);
@@ -1091,7 +1091,7 @@ class VkPostingService {
    */
   async cleanupS3Files(s3Keys) {
     try {
-      console.log(`Cleaning up ${s3Keys.length} temporary S3 files...`);
+      // console.log`Cleaning up ${s3Keys.length} temporary S3 files...`);
       const s3Service = require('./s3Service');
       
       // Удаляем файлы по одному
@@ -1099,7 +1099,7 @@ class VkPostingService {
         try {
           const result = await s3Service.deleteFile(key);
           if (result.success) {
-            console.log(`Successfully deleted S3 file: ${key}`);
+            // console.log`Successfully deleted S3 file: ${key}`);
           } else {
             console.warn(`Failed to delete S3 file: ${key}`, result.error);
           }

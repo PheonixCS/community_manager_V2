@@ -225,7 +225,7 @@ class VkApiService {
         return false;
       }
       
-      console.log(`- Filter passed for ${type}`);
+      // console.log(`- Filter passed for ${type}`);
       return true;
     });
   }
@@ -281,7 +281,7 @@ class VkApiService {
       
       // Если кеш не устарел, возвращаем закешированный ID
       if (Date.now() - cachedItem.timestamp < this.cacheTTL) {
-        console.log(`Using cached community ID for ${cacheKey}: ${cachedItem.id}`);
+        // console.log(`Using cached community ID for ${cacheKey}: ${cachedItem.id}`);
         return cachedItem.id;
       } else {
         // Удаляем устаревший кеш
@@ -326,7 +326,7 @@ class VkApiService {
     if (!posts || !posts.length) return [];
     if (!filtersSet || !filtersSet.length) return posts;
     
-    console.log(`Applying ${filtersSet.length} filter templates to ${posts.length} posts`);
+    // console.log(`Applying ${filtersSet.length} filter templates to ${posts.length} posts`);
     
     // Результирующий массив с постами, прошедшими хотя бы один шаблон
     const filteredPosts = [];
@@ -339,10 +339,10 @@ class VkApiService {
       
       if (skipExternalLinks) {
         if (this.hasExternalLinks(post.text)) {
-          console.log(`\n  ❌  post has external links`);
+          // console.log(`\n  ❌  post has external links`);
           return
         }
-        console.log(`\n  ✅  post hasnt external links`);
+        // console.log(`\n  ✅  post hasnt external links`);
       }
       
       
@@ -354,7 +354,7 @@ class VkApiService {
       };
       if (post.attachments) {
         counts = this.countAttachments(post.attachments);
-        console.log(`- Attachment counts: photos=${counts.photos}, videos=${counts.videos}, documents=${counts.documents}, audio=${counts.audio}`);
+        // console.log(`- Attachment counts: photos=${counts.photos}, videos=${counts.videos}, documents=${counts.documents}, audio=${counts.audio}`);
       }
 
       let matched = false;
@@ -370,23 +370,23 @@ class VkApiService {
           (counts.audio >= filter.audio.min && (filter.audio.max === -1 || counts.audio <= filter.audio.max));
     
         if (isMatch) {
-          console.log(`  ✅ Post ${post.id} matched filter set ${i + 1}`);
+          // console.log(`  ✅ Post ${post.id} matched filter set ${i + 1}`);
           filteredPosts.push(post);
           processedPostIds.add(post.id);
           matched = true;
           break; // Если хотя бы один набор фильтров подошел, добавляем пост и переходим к следующему
         } else {
-          console.log(`  ❌ Post ${post.id} did NOT match filter set ${i + 1}`);
+          // console.log(`  ❌ Post ${post.id} did NOT match filter set ${i + 1}`);
         }
       }
     
-      if (!matched) {
-        console.log(`❌ Post ${post.id} did not match any filter sets and was filtered out`);
-      }
+      // if (!matched) {
+      //   console.log(`❌ Post ${post.id} did not match any filter sets and was filtered out`);
+      // }
     });
     
     
-    console.log(`After applying templates: ${filteredPosts.length} posts remain`);
+    // console.log(`After applying templates: ${filteredPosts.length} posts remain`);
     return filteredPosts;
   }
   
@@ -416,7 +416,7 @@ class VkApiService {
         return mediaCheckResult;
       }
     } else {
-      console.log(`No media filters defined for template ${template.name}, skipping media check`);
+      // console.log(`No media filters defined for template ${template.name}, skipping media check`);
     }
     
     // Все проверки пройдены - пост соответствует шаблону
@@ -430,7 +430,7 @@ class VkApiService {
     // Получаем количество вложений
     const counts = this.countAttachments(post.attachments || []);
     
-    console.log(`Checking media filters for post ${post.id}:`);
+    // console.log(`Checking media filters for post ${post.id}:`);
     
     // Проверяем каждый тип медиа
     for (const [type, limits] of Object.entries(mediaFilters)) {
@@ -443,13 +443,13 @@ class VkApiService {
         continue;
       }
       
-      console.log(`- ${type}: count=${counts[type]}, min=${limits.min}, max=${limits.max}`);
+      // console.log(`- ${type}: count=${counts[type]}, min=${limits.min}, max=${limits.max}`);
       
       const count = counts[type];
       
       // Проверка минимального значения
       if (Number(limits.min) > 0 && count < Number(limits.min)) {
-        console.log(`❌ Failed min check: ${type} count (${count}) < min (${limits.min})`);
+        // console.log(`❌ Failed min check: ${type} count (${count}) < min (${limits.min})`);
         return { 
           matches: false, 
           reason: `${type} count (${count}) is less than required minimum (${limits.min})` 
@@ -458,7 +458,7 @@ class VkApiService {
       
       // Проверка максимального значения
       if (Number(limits.max) === 0 && count !== 0) {
-        console.log(`❌ Failed exact zero check: ${type} count (${count}) != 0`);
+        // console.log(`❌ Failed exact zero check: ${type} count (${count}) != 0`);
         return { 
           matches: false, 
           reason: `${type} count (${count}) must be exactly 0` 
@@ -466,7 +466,7 @@ class VkApiService {
       }
       
       if (Number(limits.max) > 0 && count > Number(limits.max)) {
-        console.log(`❌ Failed max check: ${type} count (${count}) > max (${limits.max})`);
+        // console.log(`❌ Failed max check: ${type} count (${count}) > max (${limits.max})`);
         return { 
           matches: false, 
           reason: `${type} count (${count}) exceeds maximum allowed (${limits.max})` 
@@ -474,7 +474,7 @@ class VkApiService {
       }
     }
     
-    console.log(`✅ All media filters passed for post ${post.id}`);
+    // console.log(`✅ All media filters passed for post ${post.id}`);
     return { matches: true, reason: 'Media filters passed' };
   }
   

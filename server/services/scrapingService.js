@@ -23,12 +23,12 @@ class ScrapingService {
         throw new Error(`Task with ID ${taskId} not found`);
       }
       
-      console.log(`Task loaded: ${task.name}, ${task.communities.length} communities, ${task.filterTemplates} filter templates`);
+      // console.log(`Task loaded: ${task.name}, ${task.communities.length} communities, ${task.filterTemplates} filter templates`);
       
       const filtersSet = task.filterTemplates.length > 0 
       ? task.filterTemplates.map(template => template.mediaFilters) 
       : [];
-      console.log(`Filters set: ${filtersSet[0].photos.min}`); 
+      // console.log(`Filters set: ${filtersSet[0].photos.min}`); 
       
       
       
@@ -38,12 +38,12 @@ class ScrapingService {
       
       // 3. Обработка каждого сообщества в задаче
       for (const community of task.communities) {
-        console.log(`Processing community: ${community.name} (${community.type}: ${community.value})`);
+        // console.log(`Processing community: ${community.name} (${community.type}: ${community.value})`);
         
         try {
           // Резолвим ID сообщества если нужно
           const communityId = await vkApiService.resolveCommunityId(community);
-          console.log(`Resolved community ID: ${communityId}`);
+          // console.log(`Resolved community ID: ${communityId}`);
           // console.log(task)
           // return
           // 4. Получение постов из VK API (с базовой фильтрацией по глубине)
@@ -53,14 +53,14 @@ class ScrapingService {
             extended: task.filters.extended // Используем значение extended из task.filters
           });
           
-          console.log(`Retrieved ${posts.length} posts after depth filtering`);
+          // console.log(`Retrieved ${posts.length} posts after depth filtering`);
           
           // 5. Применение шаблонов фильтрации (пост сохраняется, если проходит хотя бы один шаблон)
           //
           const filteredPosts = vkApiService.applyfiltersSet(posts, filtersSet, task.filters.skipExternalLinks);
 
           
-          console.log(`After applying filter templates: ${filteredPosts.length} posts to save`);
+          // console.log(`After applying filter templates: ${filteredPosts.length} posts to save`);
           
           // 6. Сохранение отфильтрованных постов
           for (const post of filteredPosts) {
@@ -70,16 +70,16 @@ class ScrapingService {
             // Инкрементируем счетчики на основе результата
             if (result.isNew) {
               newPostsCount++;
-              console.log(`New post ${post.id} added`);
+              // console.log(`New post ${post.id} added`);
             } else {
               updatedPostsCount++;
-              console.log(`Existing post ${post.id} updated`);
+              // console.log(`Existing post ${post.id} updated`);
             }
             
             totalProcessedPosts++;
           }
           
-          console.log(`Saved ${filteredPosts.length} posts from community ${community.name}`);
+          // console.log(`Saved ${filteredPosts.length} posts from community ${community.name}`);
           
         } catch (error) {
           console.error(`Error processing community ${community.name}:`, error);
@@ -100,7 +100,7 @@ class ScrapingService {
         'statistics.lastRunAt': new Date()
       });
       
-      console.log(`Task ${taskId} completed, processed ${totalProcessedPosts} posts (${newPostsCount} new, ${updatedPostsCount} updated)`);
+      // console.log(`Task ${taskId} completed, processed ${totalProcessedPosts} posts (${newPostsCount} new, ${updatedPostsCount} updated)`);
       
     } catch (error) {
       console.error(`Error processing task ${taskId}:`, error);
@@ -118,7 +118,7 @@ class ScrapingService {
   
   async savePost(post, task, community) {
     try {
-      console.log(`Сохраняем пост ${post.id} из сообщества ${community.name || community.value}`);
+      // console.log(`Сохраняем пост ${post.id} из сообщества ${community.name || community.value}`);
       
       // Проверяем, существует ли уже такой пост
       let existingPost = await Post.findOne({
@@ -130,10 +130,10 @@ class ScrapingService {
       
       // Определяем, является ли пост каруселью
       const isCarousel = post.carousel_offset !== undefined && post.carousel_offset === 0;
-      console.log(`Пост ${post.id} ${isCarousel ? 'является' : 'не является'} каруселью`);
+      // console.log(`Пост ${post.id} ${isCarousel ? 'является' : 'не является'} каруселью`);
       
       if (existingPost) {
-        console.log(`Пост ${post.id} уже существует, обновляем...`);
+        // console.log(`Пост ${post.id} уже существует, обновляем...`);
         // Обновляем существующий пост
         existingPost.likes = post.likes?.count || 0;
         existingPost.reposts = post.reposts?.count || 0;
@@ -143,7 +143,7 @@ class ScrapingService {
         
         // Рассчитываем рейтинг просмотров
         existingPost.viewRate = existingPost.calculateViewRate();
-        console.log(`Обновлен рейтинг просмотров для поста ${post.id}: ${existingPost.viewRate} просмотров/секунду`);
+        // console.log(`Обновлен рейтинг просмотров для поста ${post.id}: ${existingPost.viewRate} просмотров/секунду`);
         
         // Обновляем вложения, если они изменились
         if (post.attachments && (!existingPost.attachments || existingPost.attachments.length !== post.attachments.length)) {
@@ -152,7 +152,7 @@ class ScrapingService {
           // Если нужно скачать медиа и есть вложения
           // if (task.downloadMedia) {
             
-          console.log(`Скачиваем медиа для существующего поста ${post.id}`);
+          // console.log(`Скачиваем медиа для существующего поста ${post.id}`);
           const mediaDownloadService = require('./mediaDownloadService');
           
           // Получаем настройки
@@ -185,7 +185,7 @@ class ScrapingService {
         }
         
         await existingPost.save();
-        console.log(`Пост ${post.id} успешно обновлен`);
+        // console.log(`Пост ${post.id} успешно обновлен`);
         return { 
           post: existingPost, 
           isNew: false // Этот пост был обновлен, а не создан
@@ -193,7 +193,7 @@ class ScrapingService {
       }
       
       // Создаем новый пост
-      console.log(`Создаем новый пост ${post.id}`);
+      // console.log(`Создаем новый пост ${post.id}`);
       const newPost = new Post({
         vkId: post.id,
         postId: post.id,
@@ -214,15 +214,15 @@ class ScrapingService {
       
       // Рассчитываем начальный рейтинг просмотров
       newPost.viewRate = newPost.calculateViewRate();
-      console.log(`Установлен начальный рейтинг просмотров для поста ${post.id}: ${newPost.viewRate} просмотров/секунду`);
+      // console.log(`Установлен начальный рейтинг просмотров для поста ${post.id}: ${newPost.viewRate} просмотров/секунду`);
       
       // Сохраняем пост в базу данных
       const savedPost = await newPost.save();
-      console.log(`Пост ${post.id} успешно сохранен с MongoDB ID: ${savedPost._id}`);
+      // console.log(`Пост ${post.id} успешно сохранен с MongoDB ID: ${savedPost._id}`);
       
       // Скачиваем медиа, если включено в настройках и есть вложения
       if (post.attachments && post.attachments.length > 0) {
-        console.log(`Скачиваем медиа для нового поста ${post.id}`);
+        // console.log(`Скачиваем медиа для нового поста ${post.id}`);
         const mediaDownloadService = require('./mediaDownloadService');
         // Подготавливаем пост для mediaDownloadService с явным указанием _id
         const postForMediaDownload = {
@@ -273,11 +273,11 @@ class ScrapingService {
   async downloadMediaContent(post, postId) {
     try {
       if (!post.attachments || post.attachments.length === 0) {
-        console.log(`No attachments to download for post ${post.id}`);
+        // console.log(`No attachments to download for post ${post.id}`);
         return;
       }
       
-      console.log(`Downloading ${post.attachments.length} attachments for post ${post.id}`);
+      // console.log(`Downloading ${post.attachments.length} attachments for post ${post.id}`);
       
       const fs = require('fs');
       const path = require('path');
@@ -289,7 +289,7 @@ class ScrapingService {
       // Проверяем существование директории
       if (!fs.existsSync(mediaDir)) {
         fs.mkdirSync(mediaDir, { recursive: true });
-        console.log(`Created directory: ${mediaDir}`);
+        // console.log(`Created directory: ${mediaDir}`);
       }
       
       // Обрабатываем каждое вложение
@@ -306,10 +306,10 @@ class ScrapingService {
               const bestPhoto = sizes[sizes.length - 1]; // Берем последний размер
               
               mediaUrl = bestPhoto.url;
-              console.log(`Selected photo (${bestPhoto.width}x${bestPhoto.height}) for post ${post.id}, from index ${sizes.length - 1} of ${sizes.length}`);
+              // console.log(`Selected photo (${bestPhoto.width}x${bestPhoto.height}) for post ${post.id}, from index ${sizes.length - 1} of ${sizes.length}`);
               filename = `photo_${post.id}_${index}.jpg`;
             } else {
-              console.log(`No photo sizes found for post ${post.id}`);
+              // console.log(`No photo sizes found for post ${post.id}`);
               continue;
             }
           } 
@@ -319,10 +319,10 @@ class ScrapingService {
               const bestImage = attachment.video.image[attachment.video.image.length - 1];
               
               mediaUrl = bestImage.url;
-              console.log(`Selected video preview (${bestImage.width}x${bestImage.height}) for post ${post.id}`);
+              // console.log(`Selected video preview (${bestImage.width}x${bestImage.height}) for post ${post.id}`);
               filename = `video_preview_${post.id}_${index}.jpg`;
             } else {
-              console.log(`No preview image for video in post ${post.id}`);
+              // console.log(`No preview image for video in post ${post.id}`);
               continue;
             }
           }
@@ -332,11 +332,11 @@ class ScrapingService {
           }
           else if (attachment.type === 'audio') {
             // В большинстве случаев аудио недоступно для прямого скачивания
-            console.log(`Skipping audio attachment in post ${post.id}`);
+            // console.log(`Skipping audio attachment in post ${post.id}`);
             continue;
           }
           else {
-            console.log(`Unsupported attachment type: ${attachment.type} in post ${post.id}`);
+            // console.log(`Unsupported attachment type: ${attachment.type} in post ${post.id}`);
             continue;
           }
           
@@ -358,7 +358,7 @@ class ScrapingService {
               writer.on('error', reject);
             });
             
-            console.log(`Downloaded ${attachment.type} to ${filePath}`);
+            // console.log(`Downloaded ${attachment.type} to ${filePath}`);
           }
         } catch (attachError) {
           console.error(`Error downloading attachment ${index} for post ${post.id}:`, attachError.message);
@@ -366,7 +366,7 @@ class ScrapingService {
         }
       }
       
-      console.log(`Finished downloading media for post ${post.id}`);
+      // console.log(`Finished downloading media for post ${post.id}`);
     } catch (error) {
       console.error(`Error downloading media for post ${post.id}:`, error.message);
       // Не останавливаем работу из-за ошибки медиа

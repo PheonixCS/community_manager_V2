@@ -51,10 +51,10 @@ router.post('/', async (req, res) => {
     const template = new FilterTemplate(templateData);
     await template.save();
     
-    console.log('Created new filter template:', {
-      name: template.name,
-      mediaFilters: template.mediaFilters
-    });
+    // console.log('Created new filter template:', {
+    //   name: template.name,
+    //   mediaFilters: template.mediaFilters
+    // });
     
     res.status(201).json(template);
   } catch (error) {
@@ -100,10 +100,10 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Template not found' });
     }
     
-    console.log('Updated filter template:', {
-      name: template.name,
-      mediaFilters: template.mediaFilters
-    });
+    // console.log('Updated filter template:', {
+    //   name: template.name,
+    //   mediaFilters: template.mediaFilters
+    // });
     
     res.json(template);
   } catch (error) {

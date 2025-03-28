@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
   try {
     const tasks = await ScrapingTask.find().sort({ createdAt: -1 });
     // Добавим логирование для отладки
-    console.log(`Returning ${tasks.length} scraping tasks`);
+    // console.log(`Returning ${tasks.length} scraping tasks`);
     res.json(tasks);
   } catch (error) {
     console.error('Error fetching scraping tasks:', error);

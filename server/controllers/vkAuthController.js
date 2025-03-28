@@ -45,7 +45,7 @@ class VkAuthController {
         `&v=5.131`;
       
       // Log the complete URL for debugging
-      console.log('Generated VK auth URL with frontend PKCE parameters:', authUrl);
+      // console.log('Generated VK auth URL with frontend PKCE parameters:', authUrl);
       
       res.json({ authUrl });
     } catch (error) {
@@ -62,7 +62,7 @@ class VkAuthController {
       const { code, state, device_id, error, error_description } = req.query;
       
       // Log the incoming request parameters
-      console.log('VK auth callback received with params:', req.query);
+      // console.log('VK auth callback received with params:', req.query);
       
       // Handle errors
       if (error) {

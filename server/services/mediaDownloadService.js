@@ -22,7 +22,7 @@ class MediaDownloadService {
       }
       
       const sizes = [...photo.sizes].sort((a, b) => (b.width * b.height) - (a.width * a.height));
-      console.log('Photo sizes:', sizes);
+      // console.log('Photo sizes:', sizes);
       const largestPhoto = sizes[0];
       const photoUrl = largestPhoto.url;
       
@@ -205,7 +205,7 @@ class MediaDownloadService {
 
       ytdlpProcess.stdout.on('data', (data) => {
         stdoutData += data.toString();
-        console.log(`yt-dlp stdout: ${data}`);
+        // console.log(`yt-dlp stdout: ${data}`);
       });
 
       ytdlpProcess.stderr.on('data', (data) => {
@@ -215,7 +215,7 @@ class MediaDownloadService {
 
       ytdlpProcess.on('close', (code) => {
         if (code === 0) {
-          console.log(`Video downloaded successfully: ${outputPath}`);
+          // console.log(`Video downloaded successfully: ${outputPath}`);
           resolve({
             success: true,
             path: outputPath

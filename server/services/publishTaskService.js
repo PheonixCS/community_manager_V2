@@ -127,11 +127,11 @@ class PublishTaskService {
     
     // Если задача использует генератор контента
     if (task.useContentGenerator && task.contentGeneratorSettings?.generatorId) {
-      console.log('Task settings:', JSON.stringify(task.contentGeneratorSettings, null, 2));
+      // console.log('Task settings:', JSON.stringify(task.contentGeneratorSettings, null, 2));
       // Подробный вывод параметров генерации для отладки
-      if (task.contentGeneratorSettings?.params) {
-        console.log('Generator params details:', task.contentGeneratorSettings.params);
-      }
+      // if (task.contentGeneratorSettings?.params) {
+      //   console.log('Generator params details:', task.contentGeneratorSettings.params);
+      // }
       
       // Удаляем return, который блокирует выполнение
       await this.executeGeneratorTask(task, result);
@@ -443,7 +443,7 @@ class PublishTaskService {
       } 
       
       // Публикуем сгенерированный контент в каждую целевую группу
-      console.log(activeToken);
+      // console.log(activeToken);
       for (const targetGroup of task.targetGroups) {
         try {
           const publishResult = await vkPostingService.publishGeneratedPost(
