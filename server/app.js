@@ -94,8 +94,8 @@ mongoose.connect(config.mongoURI, {
   useUnifiedTopology: true,
   directConnection: true
 })
-  .then(() => {
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  .then((connection) => {
+    console.log(`MongoDB Connected: ${connection.connection.host}`);
     
     // Initialize services that require database connection
     cleanupService.init().catch(err => {
@@ -108,7 +108,7 @@ mongoose.connect(config.mongoURI, {
     
     // Запуск сервера
     const PORT = config.port || 5000;
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => { // Добавляем '0.0.0.0' для работы на всех интерфейсах
       console.log(`Server running on port ${PORT}`);
     });
   })
