@@ -130,3 +130,14 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
+
+// Обслуживание статических файлов React в production
+if (process.env.NODE_ENV === 'production') {
+  // Указываем Express раздавать файлы из папки build клиента
+  app.use(express.static(path.join(__dirname, '../client/build')));
+  
+  // Для любых запросов, не относящихся к API, возвращаем React-приложение
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  });
+}
