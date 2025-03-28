@@ -86,11 +86,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Обработка ошибок
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Server error' });
-});
+
 
 // Подключение к MongoDB
 mongoose.connect(config.mongoURI, {
@@ -139,5 +135,12 @@ if (process.env.NODE_ENV === 'production') {
   // Для любых запросов, не относящихся к API, возвращаем React-приложение
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  });
+}
+else {
+  // Обработка ошибок
+  app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Server error' });
   });
 }

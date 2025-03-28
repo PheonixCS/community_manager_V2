@@ -64,10 +64,10 @@ module.exports = {
   },
   s3: {
     endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000',
-    accessKey: process.env.S3_ACCESS_KEY || 'minioadmin',
-    secretKey: process.env.S3_SECRET_KEY || 'minioadmin',
+    accessKey: process.env.S3_ACCESS_KEY || 'miniocodex',
+    secretKey: process.env.S3_SECRET_KEY || 's8#K$pL2@q9!zR5%fXmY7',
     bucket: process.env.S3_BUCKET || 'vk-media',
-    publicEndpoint: process.env.S3_PUBLIC_ENDPOINT || 'http://krazu-group.tech:9000',
+    publicEndpoint: process.env.S3_PUBLIC_ENDPOINT || 'http://ahuyang.com:9000',
 
   },
   downloadMedia: process.env.DOWNLOAD_MEDIA === 'true'
