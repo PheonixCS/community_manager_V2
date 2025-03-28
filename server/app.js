@@ -78,13 +78,13 @@ app.use('/api/media', mediaRoutes);
 app.use('/api/cleanup', require('./routes/api/cleanup'));
 
 // Обслуживание статических файлов React в production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/build')));
+// if (process.env.NODE_ENV === 'production') {
+//   app.use(express.static(path.join(__dirname, '../client/build')));
 
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build/index.html'));
-  });
-}
+//   app.get('*', (req, res) => {
+//     res.sendFile(path.join(__dirname, '../client/build/index.html'));
+//   });
+// }
 
 
 
@@ -95,7 +95,7 @@ mongoose.connect(config.mongoURI, {
   directConnection: true
 })
   .then(() => {
-    console.log('MongoDB connected');
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
     
     // Initialize services that require database connection
     cleanupService.init().catch(err => {
