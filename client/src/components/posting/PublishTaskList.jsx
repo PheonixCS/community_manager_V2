@@ -17,7 +17,10 @@ import {
   Schedule as ScheduleIcon,
   AccessTime as OneTimeIcon,
   FilterList as FilterIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  CheckCircle as SuccessIcon,
+  Error as ErrorIcon,
+  Replay as TotalExecutionsIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
@@ -387,15 +390,34 @@ const PublishTaskList = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">
-                            Успешно: {task.statistics?.successfulPublications || 0}
-                          </Typography>
-                          <Typography variant="body2">
-                            Ошибок: {task.statistics?.failedPublications || 0}
-                          </Typography>
-                          <Typography variant="body2">
-                            Всего запусков: {task.statistics?.totalExecutions || 0}
-                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 2 }}>
+                            <Tooltip title="Успешные публикации">
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <SuccessIcon color="success" fontSize="small" sx={{ mr: 0.5 }} />
+                                <Typography variant="body2">
+                                  {task.statistics?.successfulPublications || 0}
+                                </Typography>
+                              </Box>
+                            </Tooltip>
+                            
+                            <Tooltip title="Ошибки публикации">
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <ErrorIcon color="error" fontSize="small" sx={{ mr: 0.5 }} />
+                                <Typography variant="body2">
+                                  {task.statistics?.failedPublications || 0}
+                                </Typography>
+                              </Box>
+                            </Tooltip>
+                            
+                            <Tooltip title="Всего запусков">
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <TotalExecutionsIcon color="primary" fontSize="small" sx={{ mr: 0.5 }} />
+                                <Typography variant="body2">
+                                  {task.statistics?.totalExecutions || 0}
+                                </Typography>
+                              </Box>
+                            </Tooltip>
+                          </Box>
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex' }}>

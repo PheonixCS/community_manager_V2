@@ -4,7 +4,7 @@ import {
   TextField, Card, CardContent, CardActions,
   Divider, Box, Dialog,
   DialogTitle, DialogContent, DialogActions,
-  Alert, Snackbar, FormControlLabel, Switch
+  Alert, Snackbar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -305,7 +305,7 @@ const FilterTemplatesPanel = () => {
           
           <Divider sx={{ my: 2 }} />
           
-          <FormControlLabel
+          {/* <FormControlLabel
             control={
               <Switch
                 checked={editingTemplate?.skipExternalLinks || false}
@@ -317,9 +317,9 @@ const FilterTemplatesPanel = () => {
             }
             label="Пропускать посты с внешними ссылками"
             sx={{ mb: 2 }}
-          />
+          /> */}
           
-          <TextField
+          {/* <TextField
             fullWidth
             label="Содержит текст"
             value={editingTemplate?.containsText || ''}
@@ -328,7 +328,7 @@ const FilterTemplatesPanel = () => {
               containsText: e.target.value
             }))}
             helperText="Пост должен содержать этот текст (оставьте пустым для любого текста)"
-          />
+          /> */}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Отмена</Button>

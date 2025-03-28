@@ -7,7 +7,6 @@ import AppLayout from './components/layout/AppLayout';
 import Dashboard from './components/Dashboard';
 import TaskList from './components/TaskList';
 import PostList from './components/PostList';
-import VideoDownloadList from './components/VideoDownloadList';
 import Settings from './components/Settings';
 import FilterTemplatesPanel from './components/FilterTemplatesPanel';
 import TopRatedPosts from './components/TopRatedPosts';
@@ -45,7 +44,7 @@ const ThemedApp = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/tasks" element={<TaskList />} />
               <Route path="/posts" element={<PostList />} />
-              <Route path="/videos" element={<VideoDownloadList />} />
+              {/* <Route path="/videos" element={<VideoDownloadList />} /> */}
               <Route path="/settings" element={<Settings />} />
               <Route path="/filter-templates" element={<FilterTemplatesPanel />} />
               <Route path="/top-rated-posts" element={<TopRatedPosts />} />

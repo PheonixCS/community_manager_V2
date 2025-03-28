@@ -19,7 +19,6 @@ import {
   History as HistoryIcon,
   Publish as ManualPublishIcon,
   VpnKey as AuthKeysIcon,
-  AutoFixHigh as GeneratorsIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon
 } from '@mui/icons-material';
@@ -320,7 +319,7 @@ const AppLayout = ({ children }) => {
                 <ListItemText primary="Авторизация ВК" />
               </ListItem>
               
-              <ListItem 
+              {/* <ListItem 
                 button 
                 component={Link} 
                 to="/posting/generators"
@@ -330,7 +329,7 @@ const AppLayout = ({ children }) => {
                   <GeneratorsIcon />
                 </ListItemIcon>
                 <ListItemText primary="Генераторы контента" />
-              </ListItem>
+              </ListItem> */}
             </List>
           </>
         )}
