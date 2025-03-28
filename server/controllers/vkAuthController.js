@@ -22,7 +22,7 @@ class VkAuthController {
       }
       
       // Get the correct redirect URI from configuration
-      const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
+      const redirectUri = config.vk.redirectUri || 'https://ahuyang.com/api/vk-auth/callback';
       const vkAppId = config.vk.appId;
       
       if (!vkAppId) {
@@ -162,7 +162,7 @@ class VkAuthController {
       }
       
       // Use the configured redirect URI
-      const redirectUri = config.vk.redirectUri || 'https://krazu-group.tech/api/vk-auth/callback';
+      const redirectUri = config.vk.redirectUri || 'https://ahuyang.com/api/vk-auth/callback';
       
       // Exchange the code for token
       const result = await vkAuthService.exchangeTokenWithVerifier(

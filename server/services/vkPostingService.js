@@ -20,7 +20,7 @@ class VkPostingService {
     this.uploadDelay = 1000; // 1 second delay between photo uploads
     
     // Cache the config values for better performance
-    this.s3PublicEndpoint = config.s3.publicEndpoint || 'http://krazu-group.tech:9000';
+    this.s3PublicEndpoint = config.s3.publicEndpoint || 'https://ahuyang.com:9000';
     
     // console.log`VK Posting Service initialized with API version ${vkApiVersion}`);
     // console.log`Using S3 public endpoint: ${this.s3PublicEndpoint}`);
@@ -813,7 +813,7 @@ class VkPostingService {
     const publicEndpoint = this.s3PublicEndpoint;
     
     // Если URL уже использует публичный эндпоинт, возвращаем как есть
-    if (url.includes('krazu-group.tech') || url.includes(publicEndpoint)) {
+    if (url.includes('ahuyang.com') || url.includes(publicEndpoint)) {
       return url;
     }
     
