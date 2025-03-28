@@ -42,7 +42,7 @@ const vkConfig = {
 
 module.exports = {
   port: process.env.PORT || 5000,
-  mongoURI: process.env.MONGO_URI || 'mongodb://localhost:27017/vk_scraper',
+  mongoURI: process.env.MONGO_URI || 'mongodb://vkapp:3dbU24GfKmhw8hnLV8Ob@127.0.0.1:27017/vk_scraper',
   vk: vkConfig,
   vkApi: {
     // ID приложения ВКонтакте
