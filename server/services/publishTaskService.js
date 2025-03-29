@@ -520,6 +520,7 @@ class PublishTaskService {
       const preparedTask = { ...taskData };
       
       // Для задач по расписанию рассчитываем время следующего запуска
+      console.log(preparedTask.schedule?.cronExpression);
       if (preparedTask.type === 'schedule' && preparedTask.schedule?.cronExpression) {
         const nextExecutionTime = await publishTaskRepository.calculateNextExecutionTime(
           preparedTask.schedule.cronExpression
