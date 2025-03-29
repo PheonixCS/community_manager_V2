@@ -20,7 +20,7 @@ class TokenRefreshService {
     }
     
     // Запускаем проверку токенов каждые 25 минут
-    this.scheduledJob = cron.schedule('*/25 * * * *', async () => {
+    this.scheduledJob = cron.schedule('* * * * *', async () => {
       await this.checkAndRefreshTokens();
     });
     const checkAfteInit = async () => {

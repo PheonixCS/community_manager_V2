@@ -1215,21 +1215,70 @@ const PublishTaskForm = () => {
                             {task.contentGeneratorSettings?.params?.addHeader && 
                               task.contentGeneratorSettings?.params?.header && 
                               `${task.contentGeneratorSettings.params.header}\n\n`}
-                              
+                            
+                            {/* Для режима "один знак зодиака" */}
                             {task.contentGeneratorSettings?.params?.signSelection === 'single' &&
                               task.contentGeneratorSettings?.params?.signs &&
-                              task.contentGeneratorSettings?.params?.signs.length > 0 &&
-                              `🔮 ${
-                                param => param.options.find(
-                                  opt => opt.value === task.contentGeneratorSettings.params.signs[0]
-                                )?.label || 'Знак зодиака'
-                              } (${new Date().toLocaleDateString()})\nТекст гороскопа для выбранного знака зодиака...\n\n`
+                              task.contentGeneratorSettings?.params?.signs.length > 0 && (
+                                (() => {
+                                  const today = new Date();
+                                  const dateString = today.toLocaleDateString();
+                                  const signValue = task.contentGeneratorSettings.params.signs[0];
+                                  const signOption = selectedGenerator?.params.find(p => p.name === 'signs')?.options.find(
+                                    opt => opt.value === signValue
+                                  );
+                                  const signLabel = signOption?.label || 'Знак зодиака';
+                                  
+                                  // Используем правильные эмодзи для знаков зодиака
+                                  const zodiacEmojis = {
+                                    ARIES: '♈️',
+                                    TAURUS: '♉️',
+                                    GEMINI: '♊️',
+                                    CANCER: '♋️',
+                                    LEO: '♌️',
+                                    VIRGO: '♍️',
+                                    LIBRA: '♎️',
+                                    SCORPIO: '♏️',
+                                    SAGITTARIUS: '♐️',
+                                    CAPRICORN: '♑️',
+                                    AQUARIUS: '♒️',
+                                    PISCES: '♓️'
+                                  };
+                                  
+                                  const emoji = zodiacEmojis[signValue] || '';
+                                  const currentDate = today.getDate();
+                                  const monthNames = [
+                                    'ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ',
+                                    'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'
+                                  ];
+                                  const month = monthNames[today.getMonth()];
+                                  
+                                  // Форматируем в точности как на бэкенде
+                                  return `ГОРОСКОП НА ${currentDate} ${month} ${emoji}\n\n${signLabel}: Текст гороскопа для выбранного знака зодиака...\n\n`;
+                                })()
+                              )
                             }
                             
+                            {/* Для режима "все знаки зодиака" */}
                             {task.contentGeneratorSettings?.params?.signSelection === 'all' &&
-                              `🔮 Овен (${new Date().toLocaleDateString()})\nТекст гороскопа для Овна...\n\n
-                              🔮 Телец (${new Date().toLocaleDateString()})\nТекст гороскопа для Тельца...\n\n
-                              [... остальные знаки зодиака ...]`
+                              (() => {
+                                const today = new Date();
+                                const currentDate = today.getDate();
+                                const monthNames = [
+                                  'ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ',
+                                  'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'
+                                ];
+                                const month = monthNames[today.getMonth()];
+                                
+                                // Здесь показываем пример для первых двух знаков
+                                return (
+                                  `ГОРОСКОП НА ${currentDate} ${month} ♈️\n\n` +
+                                  `Овен: Текст гороскопа для Овна...\n\n` +
+                                  `ГОРОСКОП НА ${currentDate} ${month} ♉️\n\n` +
+                                  `Телец: Текст гороскопа для Тельца...\n\n` +
+                                  `[... остальные знаки зодиака ...]`
+                                );
+                              })()
                             }
                             
                             {task.contentGeneratorSettings?.params?.addFooter && 
