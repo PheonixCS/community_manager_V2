@@ -2,8 +2,7 @@ const BaseRepository = require('./BaseRepository');
 const PublishTask = require('../models/PublishTask');
 const PublishHistory = require('../models/PublishHistory');
 const Post = require('../models/Post');
-const parser = require('cron-parser');
-
+const parser = require('cron-parser').default || require('cron-parser');
 class PublishTaskRepository extends BaseRepository {
   constructor() {
     super(PublishTask);
@@ -142,7 +141,7 @@ class PublishTaskRepository extends BaseRepository {
    */
   async calculateNextExecutionTime(cronExpression) {
     try {
-      
+      console.log(typeof parser.parseExpression); 
       const interval = parser.parseExpression(cronExpression);
       return interval.next().toDate();
     } catch (error) {
