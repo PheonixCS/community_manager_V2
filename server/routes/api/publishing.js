@@ -13,7 +13,7 @@ const PublishHistory = require('../../models/PublishHistory');
  */
 router.get('/tasks', async (req, res) => {
   try {
-    const { type, active, limit = 20, page = 1 } = req.query;
+    const { type, active, limit = 100, page = 1 } = req.query;
     const skip = (page - 1) * limit;
     
     // Построение фильтра
