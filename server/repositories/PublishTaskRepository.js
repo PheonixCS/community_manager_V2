@@ -142,7 +142,7 @@ class PublishTaskRepository extends BaseRepository {
   async calculateNextExecutionTime(cronExpression) {
     try {
       console.log(typeof parser.parseExpression); 
-      const interval = parser.parseExpression(cronExpression);
+      const interval = parser.parse(cronExpression);
       return interval.next().toDate();
     } catch (error) {
       console.error('Error parsing cron expression:', error);
