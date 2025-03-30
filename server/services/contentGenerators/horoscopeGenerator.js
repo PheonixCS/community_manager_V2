@@ -304,6 +304,8 @@ class HoroscopeGenerator {
         
         // Add image attachment if any
         if (horoscope.imageUrl) {
+          const d = new Date(horoscope.date);
+          const day = d.getDate();
           const Ru_month = monthNames[d.getMonth()];
           const header = `ГОРОСКОП НА ${day} ${Ru_month} ${emoji} ✨\n`;
           postText += header;
