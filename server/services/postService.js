@@ -32,7 +32,7 @@ class PostService {
 
         // Удаляем пост из MongoDB
         await Post.findByIdAndDelete(postId);
-
+        await this.cleanupOrphanedMedia();
         return {
             success: true,
             deletedMediaCount: mediaToDelete.length
@@ -90,6 +90,27 @@ class PostService {
       console.error('Error deleting all posts:', error);
       throw error;
     }
+  }
+  async cleanupOrphanedMedia() {
+    // 1. Получаем все посты и собираем используемые ключи
+    const posts = await Post.find({});
+    const usedKeys = new Set();
+
+    posts.forEach(post => {
+      if (post.mediaDownloads) {
+        post.mediaDownloads.forEach(media => {
+          if (media.s3Key) usedKeys.add(media.s3Key);
+        });
+      }
+      if (post.downloadedVideos) {
+        post.downloadedVideos.forEach(video => {
+          if (video.s3Key) usedKeys.add(video.s3Key);
+        });
+      }
+    });
+
+    // 2. Передаем в S3Service для очистки
+    return this.s3Service.cleanupOrphanedMedia(usedKeys);
   }
 }
 

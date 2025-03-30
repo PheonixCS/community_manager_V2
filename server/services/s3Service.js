@@ -227,6 +227,76 @@ class S3Service {
   getPublicUrl(s3Key) {
     return `${config.s3.endpoint}/${this.bucket}/${s3Key}`;
   }
+  /**
+   * Удаляет из S3 все файлы, которых нет в списке usedKeys.
+   * @param {Set<string>} usedKeys - Множество используемых ключей (например, из MongoDB).
+   * @returns {Promise<{deleted: string[], errors: string[]}>} - Результат удаления.
+   */
+  async cleanupOrphanedMedia(usedKeys) {
+    try {
+      // 1. Получаем все объекты в бакете
+      const allObjects = await this.listAllObjects();
+      const allKeys = allObjects.map(obj => obj.Key);
+
+      // 2. Находим "осиротевшие" файлы (есть в S3, но нет в usedKeys)
+      const orphanedKeys = allKeys.filter(key => !usedKeys.has(key));
+
+      if (orphanedKeys.length === 0) {
+        console.log('[S3Service] No orphaned files found.');
+        return { deleted: [], errors: [] };
+      }
+
+      // 3. Удаляем их пачками по 1000 (ограничение AWS S3 API)
+      const BATCH_SIZE = 1000;
+      const deleted = [];
+      const errors = [];
+
+      for (let i = 0; i < orphanedKeys.length; i += BATCH_SIZE) {
+        const batch = orphanedKeys.slice(i, i + BATCH_SIZE);
+        const deleteParams = {
+          Bucket: this.bucket,
+          Delete: { Objects: batch.map(Key => ({ Key })) },
+        };
+
+        try {
+          await this.s3Client.deleteObjects(deleteParams).promise();
+          deleted.push(...batch);
+          console.log(`[S3Service] Deleted batch ${i / BATCH_SIZE + 1}: ${batch.length} files`);
+        } catch (err) {
+          console.error(`[S3Service] Error deleting batch ${i / BATCH_SIZE + 1}:`, err);
+          errors.push(...batch);
+        }
+      }
+
+      return { deleted, errors };
+
+    } catch (error) {
+      console.error('[S3Service] Error in cleanupOrphanedMedia:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Получает список всех объектов в бакете (с учетом пагинации).
+   * @returns {Promise<AWS.S3.Object[]>}
+   */
+  async listAllObjects() {
+    let objects = [];
+    let continuationToken = null;
+
+    do {
+      const params = {
+        Bucket: this.bucket,
+        ContinuationToken: continuationToken,
+      };
+
+      const data = await this.s3Client.listObjectsV2(params).promise();
+      objects = objects.concat(data.Contents || []);
+      continuationToken = data.NextContinuationToken;
+    } while (continuationToken);
+
+    return objects;
+  }
 }
 
 module.exports = new S3Service();
