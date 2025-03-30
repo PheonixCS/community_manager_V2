@@ -42,6 +42,7 @@ class VkService {
         const SettingsModel = require('../models/Settings');
 
         let settings = await SettingsModel.findOne();
+        console.log('Settings:', settings);
         if (settings) {
           // удалить все
           await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value: [] } });
@@ -56,7 +57,8 @@ class VkService {
           });
           // добавляем записи в настройки
           await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value } });
-          
+          // сохраняем
+          await settings.save();
         }
         
         return response.items.map(group => ({
