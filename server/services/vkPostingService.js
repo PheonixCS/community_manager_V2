@@ -182,8 +182,8 @@ class VkPostingService {
         attachments = post.attachments;
         isCarousel = post.isCarousel;
 
-        // console.log`isCarousel: ${isCarousel}`);
-        // console.log`post: ${post._id}`);
+        console.log(`isCarousel: ${isCarousel}`);
+        console.log(`post: ${post._id}`);
         
         // Apply transformations from the options (для обратной совместимости)
         if (options.removeHashtags) {
