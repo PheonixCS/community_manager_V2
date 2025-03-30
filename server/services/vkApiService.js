@@ -126,7 +126,7 @@ class VkApiService {
       console.log('Getting posts for community:', communityId, 'with filters:', requestParams);
       
       const response = await this.api('wall.get', requestParams);
-      console.log(response);
+      // console.log(response);
       console.log(`Retrieved ${response?.items?.length || 0} posts from VK API`);
       
       if (!response || !response.items) {
