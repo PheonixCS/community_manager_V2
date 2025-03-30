@@ -12,10 +12,10 @@ const RecentActivity = ({ recentPosts }) => {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
-  const getVkPostUrl = (postId) => {
+  const getVkPostUrl = (postId, communityId) => {
     if (!postId) return '#';
-    const [communityId, id] = postId.split('_');
-    return `https://vk.com/wall${communityId}_${id}`;
+    // const [communityId, id] = postId.split('_');
+    return `https://vk.com/wall${communityId}_${postId}`;
   };
 
   const truncateText = (text, maxLength = 50) => {
@@ -54,7 +54,7 @@ const RecentActivity = ({ recentPosts }) => {
               <ListItemText
                 primary={
                   <Link 
-                    href={getVkPostUrl(post.postId)} 
+                    href={getVkPostUrl(post.postId, post.communityId)} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     underline="hover"
