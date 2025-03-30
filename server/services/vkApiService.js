@@ -123,11 +123,11 @@ class VkApiService {
         filter: filters.filter || 'all', // Используем значение фильтра или 'all' по умолчанию
         extended: filters.extended ? 1 : 0 // Преобразуем булевое значение в 1 или 0
       };
-      console.log('Getting posts for community:', communityId, 'with filters:', requestParams);
+      // console.log('Getting posts for community:', communityId, 'with filters:', requestParams);
       
       const response = await this.api('wall.get', requestParams);
       // console.log(response);
-      console.log(`Retrieved ${response?.items?.length || 0} posts from VK API`);
+      // console.log(`Retrieved ${response?.items?.length || 0} posts from VK API`);
       
       if (!response || !response.items) {
         console.error('Invalid API response:', response);
@@ -136,18 +136,18 @@ class VkApiService {
   
       let posts = response.items;
   
-      // Логируем каждый этап фильтрации
-      if (filters.depth) {
-        const depthMs = filters.depth * 60 * 60 * 1000;
-        const minDate = Date.now() - depthMs;
-        console.log('Filtering by depth, min date:', new Date(minDate));
+      // // Логируем каждый этап фильтрации
+      // if (filters.depth) {
+      //   const depthMs = filters.depth * 60 * 60 * 1000;
+      //   const minDate = Date.now() - depthMs;
+      //   // console.log('Filtering by depth, min date:', new Date(minDate));
         
-        const beforeDepthFilter = posts.length;
-        posts = posts.filter(post => post.date * 1000 >= minDate);
-        console.log(`Depth filter: ${beforeDepthFilter} -> ${posts.length} posts`);
-      }
+      //   // const beforeDepthFilter = posts.length;
+      //   posts = posts.filter(post => post.date * 1000 >= minDate);
+      //   // console.log(`Depth filter: ${beforeDepthFilter} -> ${posts.length} posts`);
+      // }
   
-      console.log(`Posts after depth filter: ${posts.length}`);
+      // console.log(`Posts after depth filter: ${posts.length}`);
       return posts;
   
     } catch (error) {
