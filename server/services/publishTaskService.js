@@ -433,7 +433,7 @@ class PublishTaskService {
    */
   transliterateText(text) {
     if (!text) return text;
-    console.log(text)
+    // console.log(text)
     const translitMap = {
       'а': 'a', 'е': 'e', 'ё': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 
       'у': 'y', 'х': 'x', 'А': 'A', 'В': 'B', 'Е': 'E', 'Ё': 'E',
