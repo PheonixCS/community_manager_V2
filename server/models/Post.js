@@ -82,7 +82,12 @@ const PostSchema = new Schema({
   viewRate: { 
     type: Number, 
     default: 0 
-  } // Рейтинг в просмотрах в секунду
+  }, // Рейтинг в просмотрах в секунду
+  
+  isCarousel: {
+    type: Boolean,
+    default: false
+  } // Флаг карусели
 });
 
 // Индексы для быстрого поиска
