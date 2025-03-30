@@ -153,7 +153,7 @@ class HoroscopeImageGenerator {
       ctx.fillStyle = 'white';
       const headerWidth = ctx.measureText(header).width;
       const headerX = (1080 - headerWidth) / 2;
-      ctx.fillText(header, headerX, this.headerHeight - 15);
+      ctx.fillText(header, headerX, this.headerHeight - 55);
       
       // Create footer icons - changed from synchronous to async
       const icons = await this.createFooterIcons();
