@@ -4,34 +4,42 @@ const s3Service = require('./s3Service');
 class PostService {
   async deletePost(postId) {
     try {
-      const post = await Post.findById(postId);
-      if (!post) {
-        throw new Error('Post not found');
-      }
+        const post = await Post.findById(postId);
+        if (!post) {
+            throw new Error('Post not found');
+        }
 
-      // Удаляем все связанные медиафайлы
-      const mediaToDelete = [
-        ...(post.mediaDownloads || []).map(media => media.s3Key),
-        ...(post.downloadedVideos || []).map(video => video.s3Key)
-      ].filter(Boolean); // Убираем пустые значения
+        // Собираем ключи для удаления
+        const mediaToDelete = [
+            ...(post.mediaDownloads || []).map(media => media.s3Key),
+            ...(post.downloadedVideos || []).map(video => video.s3Key)
+        ].filter(key => key && typeof key === 'string'); // Фильтруем пустые и нестроковые значения
 
-      // Удаляем файлы из S3 параллельно
-      if (mediaToDelete.length > 0) {
-        await Promise.all(
-          mediaToDelete.map(key => s3Service.deleteFile(key))
-        );
-      }
+        // Удаляем файлы из S3 с обработкой ошибок для каждого файла
+        if (mediaToDelete.length > 0) {
+            await Promise.all(
+                mediaToDelete.map(async (key) => {
+                    try {
+                        await s3Service.deleteFile(key);
+                        console.log(`Successfully deleted S3 file: ${key}`);
+                    } catch (err) {
+                        console.error(`Failed to delete S3 file ${key}:`, err.message);
+                        // Продолжаем выполнение, даже если один файл не удалился
+                    }
+                })
+            );
+        }
 
-      // Удаляем сам пост
-      await Post.findByIdAndDelete(postId);
+        // Удаляем пост из MongoDB
+        await Post.findByIdAndDelete(postId);
 
-      return {
-        success: true,
-        deletedMediaCount: mediaToDelete.length
-      };
+        return {
+            success: true,
+            deletedMediaCount: mediaToDelete.length
+        };
     } catch (error) {
-      console.error('Error deleting post:', error);
-      throw error;
+        console.error('Error deleting post:', error);
+        throw error;
     }
   }
 
