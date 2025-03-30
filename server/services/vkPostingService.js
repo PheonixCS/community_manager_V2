@@ -1153,7 +1153,7 @@ class VkPostingService {
             'access_token': access_token,
             'v': '5.199' // Актуальная версия VK API
         };
-
+        console.log('Параметры для video.save:', saveParams);
         // Получаем URL для загрузки
         const saveResponse = await this.makeVKRequest('video.save', saveParams);
         console.log('Получен URL для загрузки видео:', saveResponse);
