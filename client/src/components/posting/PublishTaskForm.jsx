@@ -1352,11 +1352,11 @@ const PublishTaskForm = () => {
               </Alert>
             ) : (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {task.scrapingTasks.map((taskId, index) => (
+                {task.scrapingTasks.map((scrapingTask, index) => (
                   <Chip
-                    key={index}
-                    label={getScrapingTaskName(taskId)}
-                    onDelete={() => handleScrapingTaskSelection(taskId, false)}
+                    key={scrapingTask._id || index}
+                    label={getScrapingTaskName(scrapingTask)}
+                    onDelete={() => handleScrapingTaskSelection(scrapingTask._id, false)}
                     color="secondary"
                     variant="outlined"
                   />
