@@ -118,7 +118,7 @@ class PublishTaskService {
   async executeTask(task) {
     console.log(`Executing publish task ${task._id}: ${task.name}`);
     
-    const result = {
+    let result = {
       successful: 0,
       failed: 0,
       taskId: task._id,
