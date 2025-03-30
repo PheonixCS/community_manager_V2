@@ -32,7 +32,7 @@ class PostService {
 
         // Удаляем пост из MongoDB
         await Post.findByIdAndDelete(postId);
-        await this.cleanupOrphanedMedia();
+        
         return {
             success: true,
             deletedMediaCount: mediaToDelete.length

@@ -196,7 +196,8 @@ class CleanupService {
       
       // Additional handling for duplicate media (more complex query)
       let postsToDelete = [];
-      
+      // логируем какие правила для удаления используются
+      console.log('Applying rules:', JSON.stringify(rules, null, 2));
       // Find all posts that match our query
       postsToDelete = await Post.find(query).select('_id');
       
@@ -229,6 +230,7 @@ class CleanupService {
           console.error(`Error deleting post ${postDoc._id}:`, error);
         }
       }
+      await postService.cleanupOrphanedMedia();
       
       // Update statistics
       const duration = Date.now() - startTime;
