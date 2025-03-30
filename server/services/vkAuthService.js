@@ -483,8 +483,8 @@ class VkAuthService {
         await this.refreshToken(token.deviceId, token.refreshToken, token.vkUserId);
       }
       
-      // token.isActive = true;
-      // await token.save();
+      token.isActive = true;
+      await token.save();
       
       return true;
     } catch (error) {
