@@ -1218,7 +1218,7 @@ class VkPostingService {
         };
 
         // Выполняем запрос на удаление
-        const result = await makeVKRequest('wall.delete', params);
+        const result = await this.makeVKRequest('wall.delete', params);
 
         // VK API возвращает 1 при успешном удалении
         return result === 1;
