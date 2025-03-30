@@ -574,7 +574,7 @@ class VkPostingService {
             if (videoMedia && videoMedia.s3Url) {
               // console.log`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
               try {
-                const attachmentString = await uploadVideoToVKAndGetAttachmentString(
+                const attachmentString = await this.uploadVideoToVKAndGetAttachmentString(
                   videoMedia.s3Url,
                   attachment.video.owner_id.toString(),
                   vkAccessToken // должен быть доступен в контексте
@@ -787,7 +787,7 @@ class VkPostingService {
         const matches = videoUrl.match(/video_(-?\d+)_(\d+)/);
         if (matches && matches[1] && matches[2]) {
           const ownerId = matches[1];
-          const videoId = matches[2];
+          let videoId = matches[2];
           // console.log`Using original VK video from URL: ${ownerId}_${videoId}`);
           return `video${ownerId}_${videoId}`;
         }
@@ -1155,7 +1155,7 @@ class VkPostingService {
         };
 
         // Получаем URL для загрузки
-        const saveResponse = await makeVKRequest('video.save', saveParams);
+        const saveResponse = await this.makeVKRequest('video.save', saveParams);
         const uploadUrl = saveResponse.upload_url;
         
         if (!uploadUrl) {
