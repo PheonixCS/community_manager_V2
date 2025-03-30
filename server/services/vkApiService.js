@@ -120,7 +120,7 @@ class VkApiService {
         owner_id: communityId,
         count,
         offset,
-        filter: filters.filter || 'all', // Используем значение фильтра или 'all' по умолчанию
+        filter: 'owner', // Используем значение фильтра или 'all' по умолчанию
         extended: filters.extended ? 1 : 0 // Преобразуем булевое значение в 1 или 0
       };
       // console.log('Getting posts for community:', communityId, 'with filters:', requestParams);
@@ -137,15 +137,15 @@ class VkApiService {
       let posts = response.items;
   
       // // Логируем каждый этап фильтрации
-      // if (filters.depth) {
-      //   const depthMs = filters.depth * 60 * 60 * 1000;
-      //   const minDate = Date.now() - depthMs;
-      //   // console.log('Filtering by depth, min date:', new Date(minDate));
+      if (filters.depth) {
+        const depthMs = filters.depth * 60 * 60 * 1000;
+        const minDate = Date.now() - depthMs;
+        // console.log('Filtering by depth, min date:', new Date(minDate));
         
-      //   // const beforeDepthFilter = posts.length;
-      //   posts = posts.filter(post => post.date * 1000 >= minDate);
-      //   // console.log(`Depth filter: ${beforeDepthFilter} -> ${posts.length} posts`);
-      // }
+        // const beforeDepthFilter = posts.length;
+        posts = posts.filter(post => post.date * 1000 >= minDate);
+        // console.log(`Depth filter: ${beforeDepthFilter} -> ${posts.length} posts`);
+      }
   
       // console.log(`Posts after depth filter: ${posts.length}`);
       return posts;
