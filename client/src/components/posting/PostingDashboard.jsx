@@ -30,8 +30,8 @@ const PostingDashboard = () => {
     try {
       // Parallelize API calls
       const [tasksResponse, historyResponse, tokensResponse] = await Promise.all([
-        axios.get('/api/publishing/tasks?limit=5'),
-        axios.get('/api/publishing/history?limit=5'),
+        axios.get('/api/publishing/tasks?limit=100'),
+        axios.get('/api/publishing/history?limit=100'),
         axios.get('/api/vk-auth/tokens')
       ]);
 
