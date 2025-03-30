@@ -340,7 +340,7 @@ class VkPostingService {
         _photosCount: content.attachments ? content.attachments.filter(a => a.type === 'photo').length : 0,
         ...this.preparePublishOptions(options)
       };
-      
+      console.log(`Post Data:`, postData);
       // 4. Публикуем пост через VK API с повторными попытками и обновлением токена
       let result;
       let retryCount = 0;
