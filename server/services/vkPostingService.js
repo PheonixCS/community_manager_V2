@@ -472,13 +472,13 @@ class VkPostingService {
     const hasMediaDownloads = post && post.mediaDownloads && post.mediaDownloads.length > 0;
     
     // Определяем, нужен ли режим карусели для поста
-    const isCarousel = post && post.isCarousel;
+    // const isCarousel = post && post.isCarousel;
     // if (isCarousel) {
     //   // console.log`Post is marked as carousel. Will use carousel mode for publishing.`);
     // }
     
     // Подсчитываем количество изображений для определения необходимости карусели
-    const photoAttachments = attachments.filter(a => a.type === 'photo').length;
+    // const photoAttachments = attachments.filter(a => a.type === 'photo').length;
     // console.log`Post has ${photoAttachments} photo attachments`);
     
     if (hasDownloadedVideos) {
@@ -542,27 +542,30 @@ class VkPostingService {
           // console.log`Processing video attachment: ${attachment.video?.id || 'unknown'}`);
           
           // Определяем лучший источник видео
-          let videoAttachment = null;
+          // let videoAttachment = null;
           
-          // 1. Сначала проверяем наличие в downloadedVideos (обратная совместимость)
-          if (hasDownloadedVideos) {
-            const videoId = attachment.video?.id?.toString();
-            const downloadedVideo = post.downloadedVideos.find(v => v.videoId === videoId);
+          // // 1. Сначала проверяем наличие в downloadedVideos (обратная совместимость)
+          // if (hasMediaDownloads) {
+          //   const videoId = attachment.video?.id?.toString();
+          //   // const downloadedVideo = post.hasMediaDownloads.find(v => v.videoId === videoId);
+          //   const downloadedVideo = post.mediaDownloads.find(m => 
+          //     m.type === 'video' && m.mediaId === videoId
+          //   );
             
-            if (downloadedVideo && downloadedVideo.s3Url) {
-              // console.log`Found downloaded video in downloadedVideos: ${downloadedVideo.s3Url}`);
+          //   if (downloadedVideo && downloadedVideo.s3Url) {
+          //     // console.log`Found downloaded video in downloadedVideos: ${downloadedVideo.s3Url}`);
               
-              // Используем оригинальное видео из ВК вместо загрузки своего
-              if (attachment.video?.owner_id && attachment.video?.id) {
-                // console.log`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
-                attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
-                continue;
-              }
-            }
-          }
+          //     // Используем оригинальное видео из ВК вместо загрузки своего
+          //     if (attachment.video?.owner_id && attachment.video?.id) {
+          //       // console.log`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
+          //       attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
+          //       continue;
+          //     }
+          //   }
+          // }
           
           // 2. Затем проверяем mediaDownloads (новый формат)
-          if (!videoAttachment && hasMediaDownloads) {
+          if (hasMediaDownloads) {
             const videoId = attachment.video?.id?.toString();
             const videoMedia = post.mediaDownloads.find(m => 
               m.type === 'video' && m.mediaId === videoId
@@ -570,12 +573,24 @@ class VkPostingService {
             
             if (videoMedia && videoMedia.s3Url) {
               // console.log`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
-              
-              // Используем оригинальное видео из ВК вместо загрузки своего
-              if (attachment.video?.owner_id && attachment.video?.id) {
-                // console.log`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
-                attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
+              try {
+                const attachmentString = await uploadVideoToVKAndGetAttachmentString(
+                  videoMedia.s3Url,
+                  attachment.video.owner_id.toString(),
+                  vkAccessToken // должен быть доступен в контексте
+                );
+                attachmentStrings.push(attachmentString);
                 continue;
+              }
+              catch (error) {
+              // Используем оригинальное видео из ВК вместо загрузки своего
+                console.error('Failed to upload downloaded video to VK:', error);
+                console.log(`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
+                if (attachment.video?.owner_id && attachment.video?.id) {
+                  // console.log`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
+                  attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
+                  continue;
+                }
               }
             }
           }
@@ -1110,6 +1125,132 @@ class VkPostingService {
     } catch (error) {
       console.error('Error in S3 cleanup:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 
+   * @param {*} s3Url 
+   * @param {*} owner_id 
+   * @param {*} access_token 
+   * @returns 
+   */
+  async uploadVideoToVKAndGetAttachmentString(s3Url, owner_id, access_token) {
+    try {
+        // Преобразуем owner_id в числовой формат для group_id
+        const group_id = Math.abs(parseInt(owner_id.replace('-', '')));
+        
+        // Шаг 1: Получаем URL для загрузки через video.save
+        const saveParams = {
+            'group_id': group_id,
+            'name': `Video Upload ${new Date().toISOString()}`,
+            'description': 'Uploaded via API',
+            'is_private': 1,
+            'wallpost': 0,  // не публиковать автоматически на стене
+            'no_comments': 0,
+            'repeat': 0,    // не зацикливать видео
+            'compression': 0, // без сжатия
+            'access_token': access_token,
+            'v': '5.131' // Актуальная версия VK API
+        };
+
+        // Получаем URL для загрузки
+        const saveResponse = await makeVKRequest('video.save', saveParams);
+        const uploadUrl = saveResponse.upload_url;
+        
+        if (!uploadUrl) {
+            throw new Error("Не получен URL для загрузки видео");
+        }
+
+        // Шаг 2: Загружаем видео файл на полученный URL
+        const publicUrl = this.convertLocalUrlToPublic(s3Url);
+        const videoFile = await fetch(publicUrl).then(res => res.blob());
+        
+        const formData = new FormData();
+        formData.append('file', videoFile, 'video.mp4');
+        
+        const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+            throw new Error(`Ошибка загрузки видео: ${uploadResponse.statusText}`);
+        }
+
+        const uploadResult = await uploadResponse.json();
+        
+        // Шаг 3: Получаем информацию о загруженном видео
+        if (uploadResult.video_id) {
+            return `video${owner_id}_${uploadResult.video_id}`;
+        } else {
+            throw new Error("Не удалось получить ID загруженного видео");
+        }
+    } catch (error) {
+        console.error('Ошибка при загрузке видео в VK:', error);
+        throw error;
+    }
+  }
+
+  /**
+   * 
+   * @param {*} method 
+   * @param {*} params 
+   * @param {*} attempts 
+   * @returns 
+   */
+  async makeVKRequest(method, params, attempts = 3) {
+    const API_BASE_URL = 'https://api.vk.com/method/';
+    
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        try {
+            const url = `${API_BASE_URL}${method}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams(params)
+            });
+            
+            const responseData = await response.json();
+            
+            if (responseData.error) {
+                const error = responseData.error;
+                const errorCode = error.error_code;
+                const errorMsg = error.error_msg;
+                
+                if (errorCode !== 6) { // 6 - Too many requests
+                    console.error(
+                        `VK API Error: Code ${errorCode}, Message: ${errorMsg}, ` +
+                        `Method: ${method}, Params: ${JSON.stringify(params)}`
+                    );
+                }
+                
+                // Обработка специфичных ошибок
+                if (errorCode === 219) { // Content blocked
+                    throw new Error(`VK Content Error: ${errorMsg}`);
+                }
+                
+                if (errorCode === 6 && attempt < attempts - 1) { // Rate limit
+                    const waitTime = Math.pow(2, attempt);
+                    console.log(`Rate limit hit, waiting ${waitTime} seconds before retry`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+                    continue;
+                }
+                
+                throw new Error(`VK API Error: ${errorMsg}`);
+            }
+            
+            return responseData.response;
+        } catch (error) {
+            if (attempt === attempts - 1) {
+                throw error;
+            }
+            
+            const waitTime = Math.pow(2, attempt);
+            await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+        }
     }
   }
 }

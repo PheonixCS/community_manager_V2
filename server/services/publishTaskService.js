@@ -134,10 +134,23 @@ class PublishTaskService {
       // }
       
       // Удаляем return, который блокирует выполнение
-      await this.executeGeneratorTask(task, result);
+      result = await this.executeGeneratorTask(task, result);
+      if (result) {
+        await publishTaskRepository.updateTaskStatistics(task._id, {
+          successful: result.successful,
+          failed: result.failed
+        });
+      }
     } else {
       // Задача публикации лучших постов из скрапинга
-      await this.executePostPublishingTask(task, result);
+      result = await this.executePostPublishingTask(task, result);
+      // обновление статистики task
+      if(result){
+        await publishTaskRepository.updateTaskStatistics(task._id, {
+          successful: result.successful,
+          failed: result.failed
+        });
+      }
     }
     
     console.log(`Publish task ${task._id} executed with result: ${JSON.stringify(result)}`);
@@ -151,6 +164,7 @@ class PublishTaskService {
    * @returns {Promise<void>}
    */
   async executePostPublishingTask(task, result) {
+    
     // Получаем ID задач скрапинга
     const scrapingTaskIds = task.scrapingTasks.map(t => 
       typeof t === 'string' ? t : t._id.toString()
@@ -185,10 +199,12 @@ class PublishTaskService {
           targetPostId: 'no_suitable_posts',
           errorMessage: 'Не найдены подходящие посты для публикации'
         });
+        result.failed += task.targetGroups.length;
       } catch (historyError) {
         console.error('Failed to save no-posts history:', historyError);
+        result.failed += task.targetGroups.length;
       }
-      return;
+      return result;
     }
     
     // Check tokens before attempting to publish to avoid multiple failures
@@ -221,7 +237,7 @@ class PublishTaskService {
         }
         
         result.failed += task.targetGroups.length;
-        return;
+        return result;
       }
       
       // Для каждой целевой группы публикуем лучшие посты
@@ -359,9 +375,10 @@ class PublishTaskService {
           }
         }
       }
+      return result;
     } catch (tokenCheckError) {
       console.error('Error checking tokens:', tokenCheckError);
-      // Continue and let the posting attempt handle specific errors
+      result.failed += task.targetGroups.length;
     }
     
     
@@ -439,6 +456,7 @@ class PublishTaskService {
           targetPostId: 'no_tokens',
           errorMessage: 'Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".'
         });
+        result.failed += task.targetGroups.length;
         throw new Error('No active tokens available for publishing');
       } 
       
@@ -507,6 +525,7 @@ class PublishTaskService {
       console.error(`Error executing generator task ${task._id}:`, error);
       result.failed += task.targetGroups.length; // Считаем все попытки как неудачные
     }
+    return result;
   }
 
   /**
