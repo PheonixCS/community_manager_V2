@@ -93,7 +93,7 @@ class ScrapingService {
       
       await Task.findByIdAndUpdate(taskId, {
         'schedule.lastRun': new Date(),
-        'shedule.nextRun': new Date(Date.now() + task.schedule.interval * 60 * 1000), // Устанавливаем следующее время запуска
+        'schedule.nextRun': new Date(Date.now() + task.schedule.interval * 60 * 1000), // Устанавливаем следующее время запуска
         status: 'completed',
         'statistics.totalPosts': totalPosts,
         'statistics.newPostsLastRun': newPostsCount,
