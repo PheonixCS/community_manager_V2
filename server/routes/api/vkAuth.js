@@ -148,7 +148,8 @@ router.get('/groups', async (req, res) => {
       // Format groups for storage
       const formattedGroups = groups.map(group => ({
         id: `-${group.id}`,
-        name: group.name
+        name: group.name,
+        screen_name: group.screen_name || null  // Добавляем доменное имя
       }));
       
       settings.vkGroups = formattedGroups;
@@ -189,6 +190,121 @@ router.get('/groups', async (req, res) => {
     res.json({
       response: { count: 0, items: [] },
       error: error.message
+    });
+  }
+});
+
+/**
+ * Обновление списка групп пользователя из ВКонтакте
+ * GET /api/vk-auth/refresh-groups
+ */
+router.get('/refresh-groups', async (req, res) => {
+  try {
+    const vkAuthService = require('../../services/vkAuthService');
+    const Settings = require('../../models/Settings');
+    const axios = require('axios');
+    
+    // Получаем текущие настройки
+    let settings = await Settings.findOne({}) || new Settings({});
+    const existingGroups = settings.vkGroups || [];
+    
+    // Создаем Map существующих групп для быстрого доступа
+    const existingGroupsMap = new Map();
+    existingGroups.forEach(group => {
+      existingGroupsMap.set(group.id, {
+        name: group.name,
+        screen_name: group.screen_name
+      });
+    });
+    
+    // Получаем токен для запроса к API
+    const token = await vkAuthService.getActiveToken(['groups']);
+    
+    if (!token) {
+      return res.status(401).json({ 
+        error: 'Не найден активный токен ВКонтакте с правами на доступ к группам',
+        success: false
+      });
+    }
+    
+    // Запрашиваем актуальный список групп из API
+    const response = await axios.get('https://api.vk.com/method/groups.get', {
+      params: {
+        access_token: token.accessToken,
+        filter: 'admin',
+        extended: 1,
+        fields: 'screen_name', // Запрашиваем доменное имя
+        v: '5.131'
+      },
+      timeout: 5000
+    });
+    
+    if (response.data.error) {
+      throw new Error(`VK API Error: ${response.data.error.error_msg}`);
+    }
+    
+    const freshGroups = response.data.response.items || [];
+    const updatedGroups = [];
+    let newGroupsCount = 0;
+    let updatedGroupsCount = 0;
+    
+    // Обрабатываем полученные группы
+    freshGroups.forEach(group => {
+      const groupId = `-${group.id}`;
+      
+      // Форматируем группу с доменным именем
+      const formattedGroup = {
+        id: groupId,
+        name: group.name,
+        screen_name: group.screen_name || null // Сохраняем доменное имя
+      };
+      
+      if (existingGroupsMap.has(groupId)) {
+        // Группа уже существует, проверяем необходимость обновления
+        const existingGroup = existingGroupsMap.get(groupId);
+        
+        if (existingGroup.name !== group.name || existingGroup.screen_name !== group.screen_name) {
+          // Имя или доменное имя изменилось, обновляем
+          updatedGroupsCount++;
+        }
+        
+        // Удаляем из Map, чтобы в конце там остались только группы, которых нет в свежем списке
+        existingGroupsMap.delete(groupId);
+      } else {
+        // Новая группа, которой не было в существующем списке
+        newGroupsCount++;
+      }
+      
+      updatedGroups.push(formattedGroup);
+    });
+    
+    // Добавляем обратно группы, которые остались в Map (они не пришли в свежем списке)
+    // но мы их сохраняем, как вы указали
+    existingGroupsMap.forEach((value, key) => {
+      updatedGroups.push({
+        id: key,
+        name: value.name,
+        screen_name: value.screen_name
+      });
+    });
+    
+    // Сохраняем обновленный список групп в настройки
+    settings.vkGroups = updatedGroups;
+    await settings.save();
+    
+    res.json({
+      success: true,
+      totalGroups: updatedGroups.length,
+      newGroups: newGroupsCount,
+      updatedGroups: updatedGroupsCount,
+      message: `Список групп обновлен. Добавлено новых: ${newGroupsCount}, обновлено: ${updatedGroupsCount}.`
+    });
+    
+  } catch (error) {
+    console.error('Error refreshing VK groups:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Ошибка при обновлении списка групп'
     });
   }
 });

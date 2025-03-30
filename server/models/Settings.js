@@ -50,7 +50,8 @@ const SettingsSchema = new mongoose.Schema({
   vkGroups: {
     type: [{
       id: String,
-      name: String
+      name: String,
+      screen_name: String // Array of group IDs
     }],
     default: []
   },
