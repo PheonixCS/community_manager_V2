@@ -110,7 +110,7 @@ class PostService {
     });
 
     // 2. Передаем в S3Service для очистки
-    return this.s3Service.cleanupOrphanedMedia(usedKeys);
+    return s3Service.cleanupOrphanedMedia(usedKeys);
   }
 }
 
