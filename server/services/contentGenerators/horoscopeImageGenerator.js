@@ -365,7 +365,7 @@ class HoroscopeImageGenerator {
   drawFooter(ctx, width, icons) {
     // Improved positioning for footer elements with values on the right side of icons
     const iconSpacing = width / 5;
-    const footerBottomMargin = 5; // Отступ снизу в 5 пикселей
+    const footerBottomMargin = -15; // Отступ снизу в 5 пикселей
     const iconSize = 65;
     const textOffsetX = 15; // Horizontal space between icon and text
     const iconY = 1080 - this.footerHeight + iconSize / 2 + footerBottomMargin; // Сдвигаем вверх на 5px + центрируем иконки
