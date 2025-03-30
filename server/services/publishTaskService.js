@@ -253,7 +253,23 @@ class PublishTaskService {
         
         if (bestPosts.length === 0) {
           console.log(`No suitable posts found for publishing to group ${targetGroup.groupId}`);
-          result.failed++;
+          try {
+            await publishTaskRepository.savePublishHistory({
+              sourcePostId: 'no_posts',
+              postId: null,
+              sourceGroupId: 'n/a',
+              targetGroupId: task.targetGroups.length > 0 ? task.targetGroups[0].groupId : 'no_target',
+              publishedAt: new Date(),
+              publishTaskId: task._id,
+              status: 'failed',
+              targetPostId: 'no_suitable_posts',
+              errorMessage: 'Не найдены подходящие посты для публикации'
+            });
+            result.failed++;
+          } catch (historyError) {
+            console.error('Failed to save no-posts history:', historyError);
+            result.failed++;
+          }
           continue;
         }
         for (const post of bestPosts) {
