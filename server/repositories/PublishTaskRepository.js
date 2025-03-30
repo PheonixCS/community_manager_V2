@@ -151,41 +151,42 @@ class PublishTaskRepository extends BaseRepository {
   }
 
   /**
-   * Найти лучшие посты для публикации из заданий скрапинга
+   * Найти лучшие посты для публикации из заданий скрапинга, которые еще не были опубликованы в указанное сообщество
    * @param {Array<string>} scrapingTaskIds - Массив ID заданий скрапинга
    * @param {number} limit - Максимальное количество постов
    * @param {number} minViewRate - Минимальный рейтинг просмотров
    * @returns {Promise<Array<Document>>} Массив постов для публикации
    */
-  async findBestPostsForPublishing(scrapingTaskIds, limit = 1, minViewRate = 0) {
+  async findBestPostsForPublishing(scrapingTaskIds, limit = 1, minViewRate = 0, targetGroupId) {
     try {
-      // 1. Получаем ID постов, которые уже были опубликованы
+      // 1. Получаем ID постов, которые уже были опубликованы в это сообщество
       const publishedHistory = await PublishHistory.find({
-        status: 'success'
+        status: 'success',
+        targetGroupId: targetGroupId
       }).select('postId');
       
       // Извлекаем ID опубликованных постов
       const publishedPostIds = publishedHistory.map(h => h.postId);
       
-      console.log(`Found ${publishedPostIds.length} already published posts to exclude`);
+      console.log(`Found ${publishedPostIds.length} posts already published in target group ${targetGroupId}`);
       
-      // 2. Строим запрос с исключением опубликованных постов
+      // 2. Строим запрос с исключением опубликованных в это сообщество постов
       const query = {
         taskId: { $in: scrapingTaskIds },
         viewRate: { $gte: minViewRate }
       };
       
-      // Исключаем посты, которые уже были опубликованы
+      // Исключаем посты, которые уже были опубликованы в это сообщество
       if (publishedPostIds.length > 0) {
         query._id = { $nin: publishedPostIds };
       }
       
-      // 3. Получаем неопубликованные посты, отсортированные по рейтингу
+      // 3. Получаем неопубликованные в это сообщество посты, отсортированные по рейтингу
       const posts = await Post.find(query)
         .sort({ viewRate: -1 })
         .limit(limit);
       
-      console.log(`Found ${posts.length} unpublished posts for publishing`);
+      console.log(`Found ${posts.length} unpublished posts for target group ${targetGroupId}`);
       
       return posts;
     } catch (error) {

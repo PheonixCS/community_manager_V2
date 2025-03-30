@@ -175,37 +175,37 @@ class PublishTaskService {
       return;
     }
     
-    // Находим лучшие посты для публикации
-    const bestPosts = await publishTaskRepository.findBestPostsForPublishing(
-      scrapingTaskIds,
-      task.postsPerExecution || 1,
-      task.minViewRate || 0
-    );
+    // // Находим лучшие посты для публикации
+    // const bestPosts = await publishTaskRepository.findBestPostsForPublishing(
+    //   scrapingTaskIds,
+    //   task.postsPerExecution || 1,
+    //   task.minViewRate || 0
+    // );
     
-    console.log(`Found ${bestPosts.length} best posts for publishing`);
+    // console.log(`Found ${bestPosts.length} best posts for publishing`);
     
-    if (bestPosts.length === 0) {
-      console.log('No suitable posts found for publishing');
-      // Save this fact in history for better reporting
-      try {
-        await publishTaskRepository.savePublishHistory({
-          sourcePostId: 'no_posts',
-          postId: null,
-          sourceGroupId: 'n/a',
-          targetGroupId: task.targetGroups.length > 0 ? task.targetGroups[0].groupId : 'no_target',
-          publishedAt: new Date(),
-          publishTaskId: task._id,
-          status: 'failed',
-          targetPostId: 'no_suitable_posts',
-          errorMessage: 'Не найдены подходящие посты для публикации'
-        });
-        result.failed += task.targetGroups.length;
-      } catch (historyError) {
-        console.error('Failed to save no-posts history:', historyError);
-        result.failed += task.targetGroups.length;
-      }
-      return result;
-    }
+    // if (bestPosts.length === 0) {
+    //   console.log('No suitable posts found for publishing');
+    //   // Save this fact in history for better reporting
+    //   try {
+    //     await publishTaskRepository.savePublishHistory({
+    //       sourcePostId: 'no_posts',
+    //       postId: null,
+    //       sourceGroupId: 'n/a',
+    //       targetGroupId: task.targetGroups.length > 0 ? task.targetGroups[0].groupId : 'no_target',
+    //       publishedAt: new Date(),
+    //       publishTaskId: task._id,
+    //       status: 'failed',
+    //       targetPostId: 'no_suitable_posts',
+    //       errorMessage: 'Не найдены подходящие посты для публикации'
+    //     });
+    //     result.failed += task.targetGroups.length;
+    //   } catch (historyError) {
+    //     console.error('Failed to save no-posts history:', historyError);
+    //     result.failed += task.targetGroups.length;
+    //   }
+    //   return result;
+    // }
     
     // Check tokens before attempting to publish to avoid multiple failures
     try {
@@ -242,6 +242,20 @@ class PublishTaskService {
       
       // Для каждой целевой группы публикуем лучшие посты
       for (const targetGroup of task.targetGroups) {
+        const bestPosts = await publishTaskRepository.findBestPostsForPublishing(
+          scrapingTaskIds,
+          task.postsPerExecution || 1,
+          task.minViewRate || 0,
+          targetGroup.groupId // передаем ID целевого сообщества
+        );
+        
+        console.log(`Found ${bestPosts.length} best posts for publishing to group ${targetGroup.groupId}`);
+        
+        if (bestPosts.length === 0) {
+          console.log(`No suitable posts found for publishing to group ${targetGroup.groupId}`);
+          result.failed++;
+          continue;
+        }
         for (const post of bestPosts) {
           try {
             console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens?.length || 'unknown'} active tokens`);
