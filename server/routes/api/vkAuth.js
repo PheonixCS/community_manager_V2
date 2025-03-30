@@ -309,4 +309,98 @@ router.get('/refresh-groups', async (req, res) => {
   }
 });
 
+
+/**
+ * Получение текущих прав доступа
+ * GET /api/vk-auth/permissions
+ */
+router.get('/permissions', async (req, res) => {
+  try {
+    const vkAuthService = require('../../services/vkAuthService');
+    const axios = require('axios');
+    
+    // Получаем активный токен
+    const token = await vkAuthService.getActiveToken();
+    
+    if (!token) {
+      return res.status(401).json({ 
+        error: 'Не найден активный токен ВКонтакте',
+        permissions: 0,
+        permissionList: []
+      });
+    }
+    
+    // Запрос к VK API для получения битовой маски прав
+    const response = await axios.get('https://api.vk.com/method/account.getAppPermissions', {
+      params: {
+        access_token: token.accessToken,
+        v: '5.131'
+      },
+      timeout: 5000
+    });
+    
+    if (response.data.error) {
+      throw new Error(`VK API Error: ${response.data.error.error_msg}`);
+    }
+    
+    const permissionsMask = response.data.response || 0;
+    
+    // Определение прав на основе битовой маски
+    const permissionsMap = {
+      notify: { bit: 1, name: 'Уведомления', description: 'Отправка уведомлений пользователю' },
+      friends: { bit: 2, name: 'Друзья', description: 'Доступ к друзьям' },
+      photos: { bit: 4, name: 'Фотографии', description: 'Доступ к фотографиям' },
+      audio: { bit: 8, name: 'Аудиозаписи', description: 'Доступ к аудиозаписям' },
+      video: { bit: 16, name: 'Видеозаписи', description: 'Доступ к видеозаписям' },
+      stories: { bit: 64, name: 'Истории', description: 'Доступ к историям' },
+      pages: { bit: 128, name: 'Страницы', description: 'Доступ к wiki-страницам' },
+      menu: { bit: 256, name: 'Меню', description: 'Добавление ссылки в меню слева' },
+      status: { bit: 1024, name: 'Статус', description: 'Доступ к статусу пользователя' },
+      notes: { bit: 2048, name: 'Заметки', description: 'Доступ к заметкам пользователя' },
+      messages: { bit: 4096, name: 'Сообщения', description: 'Доступ к сообщениям пользователя' },
+      wall: { bit: 8192, name: 'Стена', description: 'Доступ к методам работы со стеной' },
+      ads: { bit: 32768, name: 'Реклама', description: 'Доступ к рекламному API' },
+      offline: { bit: 65536, name: 'Оффлайн-доступ', description: 'Доступ к API в любое время (бессрочный токен)' },
+      docs: { bit: 131072, name: 'Документы', description: 'Доступ к документам' },
+      groups: { bit: 262144, name: 'Группы', description: 'Доступ к группам пользователя' },
+      notifications: { bit: 524288, name: 'Оповещения', description: 'Доступ к оповещениям об ответах' },
+      stats: { bit: 1048576, name: 'Статистика', description: 'Доступ к статистике групп и приложений' },
+      email: { bit: 4194304, name: 'Email', description: 'Доступ к email пользователя' },
+      market: { bit: 134217728, name: 'Товары', description: 'Доступ к товарам' },
+      phone_number: { bit: 268435456, name: 'Телефон', description: 'Доступ к номеру телефона' },
+    };
+    
+    // Определяем наличие каждого права через побитовое "И" (&)
+    const grantedPermissions = [];
+    for (const [permission, info] of Object.entries(permissionsMap)) {
+      if (permissionsMask & info.bit) {
+        grantedPermissions.push({
+          key: permission,
+          name: info.name,
+          description: info.description,
+          bit: info.bit
+        });
+      }
+    }
+    
+    // Отправляем результат
+    res.json({
+      success: true,
+      permissionsMask,
+      grantedPermissions,
+      // Также отправляем расшифровку строкой для удобства
+      permissionsDescription: grantedPermissions.map(p => p.name).join(', ')
+    });
+    
+  } catch (error) {
+    console.error('Error getting VK permissions:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Ошибка при получении прав доступа',
+      permissions: 0,
+      permissionList: []
+    });
+  }
+});
+
 module.exports = router;
