@@ -1355,7 +1355,7 @@ const PublishTaskForm = () => {
                 {task.scrapingTasks.map((scrapingTask, index) => (
                   <Chip
                     key={scrapingTask._id || index}
-                    label={getScrapingTaskName(scrapingTask)}
+                    label={getScrapingTaskName(scrapingTask._id)}
                     onDelete={() => handleScrapingTaskSelection(scrapingTask._id, false)}
                     color="secondary"
                     variant="outlined"
