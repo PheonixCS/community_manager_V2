@@ -271,18 +271,15 @@ class HoroscopeGenerator {
         'ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ',
         'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'
       ];
-      const d = new Date(horoscope.date);
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
       const day = d.getDate();
+      const month = monthNames[d.getMonth()];
       for (let i = 0; i < signs.length; i++) {
         const horoscope = signs[i];
         
         // Only include text if we're not using images or this specific horoscope doesn't have an image
         if (params.imageType !== 'image' || !horoscope.imageUrl) {
-          
-          // Получаем компоненты даты
-          const d = new Date(horoscope.date);
-          const day = d.getDate();
-          const month = monthNames[d.getMonth()];
           // Получаем эмодзи знака зодиака
           const zodiacEmojis = {
             ARIES: '♈️',
