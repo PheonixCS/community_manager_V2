@@ -1151,11 +1151,12 @@ class VkPostingService {
             'repeat': 0,    // не зацикливать видео
             'compression': 0, // без сжатия
             'access_token': access_token,
-            'v': '5.131' // Актуальная версия VK API
+            'v': '5.199' // Актуальная версия VK API
         };
 
         // Получаем URL для загрузки
         const saveResponse = await this.makeVKRequest('video.save', saveParams);
+        console.log('Получен URL для загрузки видео:', saveResponse);
         const uploadUrl = saveResponse.upload_url;
         
         if (!uploadUrl) {
