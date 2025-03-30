@@ -3,6 +3,7 @@ const router = express.Router();
 const Post = require('../../models/Post');
 const postService = require('../../services/postService');
 const videoDownloadService = require('../../services/videoDownloadService');
+const vkPostingService = require('../../services/vkPostingService');
 
 // Получить все посты с пагинацией и фильтрацией
 router.get('/', async (req, res) => {
@@ -155,6 +156,28 @@ router.delete('/clear', async (req, res) => {
   } catch (error) {
     console.error('Error clearing posts database:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// маршрут удаления поста по ссылке на пост из vk используя сервис vkPostingService и активный токен
+router.delete('/delete-by-link', async (req, res) => {
+  try {
+    const { postLink } = req.body;
+    if (!postLink) {
+      return res.status(400).json({ error: 'Post link is required' });
+    }
+    const activeToken = await vkPostingService.getPublishToken();
+    if (!activeToken) {
+      return res.status(400).json({ error: 'No active token found' });
+    }
+    const result = await vkPostingService.deleteVKPostByUrl(postLink, activeToken);
+    res.json({
+      message: `Пост успешно удален из ВКонтакте`,
+      ...result
+    });
+  } catch (error) {
+      console.error('Error deleting post by link:', error);
+      res.status(500).json({ error: error.message });
   }
 });
 

@@ -1193,6 +1193,41 @@ class VkPostingService {
   }
 
   /**
+   * Удаляет пост в VK по ссылке на пост
+   * @param {string} postUrl - Ссылка на пост в формате https://vk.com/wall-12345_67890
+   * @param {string} accessToken - Токен доступа VK API
+   * @returns {Promise<boolean>} - true, если пост успешно удален
+   */
+  async deleteVKPostByUrl(postUrl, accessToken) {
+    try {
+        // Извлекаем owner_id и post_id из URL
+        const matches = postUrl.match(/wall(-?\d+)_(\d+)/);
+        if (!matches || matches.length < 3) {
+            throw new Error('Неверный формат ссылки на пост VK');
+        }
+
+        const ownerId = matches[1];
+        const postId = matches[2];
+
+        // Параметры для запроса wall.delete
+        const params = {
+            owner_id: ownerId,
+            post_id: postId,
+            access_token: accessToken,
+            v: '5.131' // Версия API
+        };
+
+        // Выполняем запрос на удаление
+        const result = await makeVKRequest('wall.delete', params);
+
+        // VK API возвращает 1 при успешном удалении
+        return result === 1;
+    } catch (error) {
+        console.error('Ошибка при удалении поста:', error);
+        throw error;
+    }
+  }
+  /**
    * 
    * @param {*} method 
    * @param {*} params 
