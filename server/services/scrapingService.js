@@ -194,6 +194,7 @@ class ScrapingService {
       
       // Создаем новый пост
       // console.log(`Создаем новый пост ${post.id}`);
+      console.log(post);
       const newPost = new Post({
         vkId: post.id,
         postId: post.id,
