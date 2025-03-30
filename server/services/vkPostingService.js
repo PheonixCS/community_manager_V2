@@ -552,7 +552,7 @@ class VkPostingService {
                 console.log(`params: ${videoMedia.s3Url}, ${attachment.video.owner_id}, ${token}`);
                 const attachmentString = await this.uploadVideoToVKAndGetAttachmentString(
                   videoMedia.s3Url,
-                  attachment.video.owner_id.toString(),
+                  communityId,
                   token
                 );
                 console.log(`attachmentString: ${attachmentString}`);
