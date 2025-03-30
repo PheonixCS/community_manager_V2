@@ -153,7 +153,7 @@ class HoroscopeImageGenerator {
       ctx.fillStyle = 'white';
       const headerWidth = ctx.measureText(header).width;
       const headerX = (1080 - headerWidth) / 2;
-      ctx.fillText(header, headerX, this.headerHeight - 30);
+      ctx.fillText(header, headerX, this.headerHeight - 15);
       
       // Create footer icons - changed from synchronous to async
       const icons = await this.createFooterIcons();
@@ -365,7 +365,8 @@ class HoroscopeImageGenerator {
   drawFooter(ctx, width, icons) {
     // Improved positioning for footer elements with values on the right side of icons
     const iconSpacing = width / 5;
-    const iconY = 1080 - this.footerHeight / 2; // Center icons vertically in footer area
+    const footerBottomMargin = 5; // Отступ снизу в 5 пикселей
+    const iconY = 1080 - this.footerHeight + iconSize / 2 + footerBottomMargin; // Сдвигаем вверх на 5px + центрируем иконки
     const iconSize = 65;
     const textOffsetX = 15; // Horizontal space between icon and text
     
