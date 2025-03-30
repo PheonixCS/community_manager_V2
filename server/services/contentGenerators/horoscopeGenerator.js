@@ -269,13 +269,13 @@ class HoroscopeGenerator {
       const signs = Object.values(horoscopeData);
       for (let i = 0; i < signs.length; i++) {
         const horoscope = signs[i];
-        
+        const monthNames = [
+          'ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ',
+          'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'
+        ];
         // Only include text if we're not using images or this specific horoscope doesn't have an image
         if (params.imageType !== 'image' || !horoscope.imageUrl) {
-          const monthNames = [
-            'ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ',
-            'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'
-          ];
+          
           // Получаем компоненты даты
           const d = new Date(horoscope.date);
           const day = d.getDate();
@@ -304,6 +304,9 @@ class HoroscopeGenerator {
         
         // Add image attachment if any
         if (horoscope.imageUrl) {
+          const Ru_month = monthNames[d.getMonth()];
+          const header = `ГОРОСКОП НА ${day} ${Ru_month} ${emoji} ✨\n`;
+          postText += header;
           attachments.push({
             type: 'photo',
             url: horoscope.imageUrl,
