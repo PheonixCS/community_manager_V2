@@ -220,7 +220,7 @@ const AppLayout = ({ children }) => {
                 <ListItemText primary="Топ постов" />
               </ListItem>
               
-              <ListItem 
+              {/* <ListItem 
                 button 
                 component={Link} 
                 to="/videos"
@@ -230,7 +230,7 @@ const AppLayout = ({ children }) => {
                   <VideosIcon />
                 </ListItemIcon>
                 <ListItemText primary="Видео" />
-              </ListItem>
+              </ListItem> */}
               
               <ListItem 
                 button 
