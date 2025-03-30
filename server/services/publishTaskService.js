@@ -433,15 +433,18 @@ class PublishTaskService {
    */
   transliterateText(text) {
     if (!text) return text;
-    
+    console.log(text)
     const translitMap = {
       'а': 'a', 'е': 'e', 'ё': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 
       'у': 'y', 'х': 'x', 'А': 'A', 'В': 'B', 'Е': 'E', 'Ё': 'E',
       'К': 'K', 'М': 'M', 'Н': 'H', 'О': 'O', 'Р': 'P', 'С': 'C',
-      'Т': 'T', 'Х': 'X', 'У': 'Y'
+      'Т': 'T', 'Х': 'X'
     };
-    
-    return text.split('').map(char => translitMap[char] || char).join('');
+    let result = text.split('').map(char => {
+      // Если символ есть в мапе - заменяем, иначе оставляем как есть (включая \n, \t и другие)
+      return translitMap[char] !== undefined ? translitMap[char] : char;
+    }).join('');
+    return result;
   }
 
   /**
