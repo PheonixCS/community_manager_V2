@@ -93,11 +93,13 @@ class ScrapingService {
       
       await Task.findByIdAndUpdate(taskId, {
         'schedule.lastRun': new Date(),
+        'shedule.nextRun': new Date(Date.now() + task.schedule.interval * 60 * 1000), // Устанавливаем следующее время запуска
         status: 'completed',
         'statistics.totalPosts': totalPosts,
         'statistics.newPostsLastRun': newPostsCount,
         'statistics.updatedPostsLastRun': updatedPostsCount,
-        'statistics.lastRunAt': new Date()
+        'statistics.lastRunAt': new Date(),
+        
       });
       
       // console.log(`Task ${taskId} completed, processed ${totalProcessedPosts} posts (${newPostsCount} new, ${updatedPostsCount} updated)`);
