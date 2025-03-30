@@ -39,27 +39,27 @@ class VkService {
           fields: 'name,screen_name,photo_50,members_count'
         });
         // обновить группы в настройках
-        const SettingsModel = require('../models/Settings');
+        // const SettingsModel = require('../models/Settings');
 
-        let settings = await SettingsModel.findOne();
-        console.log('Settings:', settings);
-        if (settings) {
-          // удалить все
-          await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value: [] } });
+        // let settings = await SettingsModel.findOne();
+        // console.log('Settings:', settings);
+        // if (settings) {
+        //   // удалить все
+        //   await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value: [] } });
 
-          // добавить новые
-          let value = [];
-          response.items.forEach(group => {
-            value.push({
-              id: `-${group.id}`, // Negative ID for groups in VK API
-              name: group.name,
-            })
-          });
-          // добавляем записи в настройки
-          await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value } });
-          // сохраняем
-          await settings.save();
-        }
+        //   // добавить новые
+        //   let value = [];
+        //   response.items.forEach(group => {
+        //     value.push({
+        //       id: `-${group.id}`, // Negative ID for groups in VK API
+        //       name: group.name,
+        //     })
+        //   });
+        //   // добавляем записи в настройки
+        //   await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value } });
+        //   // сохраняем
+        //   await settings.save();
+        // }
         
         return response.items.map(group => ({
           id: `-${group.id}`, // Negative ID for groups in VK API
