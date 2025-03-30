@@ -40,7 +40,8 @@ class VkService {
         });
         // обновить группы в настройках
         const SettingsModel = require('../models/Settings');
-        const settings = await SettingsModel.findOne({ key: 'vk-groups' });
+
+        let settings = await Settings.findOne();
         if (settings) {
           // удалить все
           await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value: [] } });
@@ -53,8 +54,9 @@ class VkService {
               name: group.name,
             })
           });
+          // добавляем записи в настройки
           await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value } });
-          // await SettingsModel.updateOne({ key: 'vk-groups' }, { $set: { value: response.items } });
+          
         }
         
         return response.items.map(group => ({
