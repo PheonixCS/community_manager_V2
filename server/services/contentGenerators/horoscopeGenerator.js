@@ -271,30 +271,53 @@ class HoroscopeGenerator {
         'ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ',
         'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'
       ];
+      const zodiacEmojis = {
+        ARIES: '♈️',
+        TAURUS: '♉️',
+        GEMINI: '♊️',
+        CANCER: '♋️',
+        LEO: '♌️',
+        VIRGO: '♍️',
+        LIBRA: '♎️',
+        SCORPIO: '♏️',
+        SAGITTARIUS: '♐️',
+        CAPRICORN: '♑️',
+        AQUARIUS: '♒️',
+        PISCES: '♓️'
+      };
+      const ruZodiacSign = {
+        ARIES: 'овен',
+        TAURUS: 'телец',
+        GEMINI: 'близнецы',
+        CANCER: 'рак',
+        LEO: 'лев',
+        VIRGO: 'дева',
+        LIBRA: 'весы',
+        SCORPIO: 'скорпион',
+        SAGITTARIUS: 'стрелец',
+        CAPRICORN: 'козерог',
+        AQUARIUS: 'водолей',
+        PISCES: 'рыбы'
+      };
+      let signsList = []; // Массив для сбора названий знаков
       const d = new Date();
       d.setDate(d.getDate() + 1);
       const day = d.getDate();
       const month = monthNames[d.getMonth()];
+      // If we have images but no text (only header/footer), add a minimal text
+      if (params.imageType === 'image') {
+        const Ru_month = monthNames[d.getMonth()];
+        const header = `ГОРОСКОП НА ${day} ${Ru_month} ✨\n`;
+        postText += header;
+      }
+
       for (let i = 0; i < signs.length; i++) {
         const horoscope = signs[i];
         
         // Only include text if we're not using images or this specific horoscope doesn't have an image
         if (params.imageType !== 'image' || !horoscope.imageUrl) {
           // Получаем эмодзи знака зодиака
-          const zodiacEmojis = {
-            ARIES: '♈️',
-            TAURUS: '♉️',
-            GEMINI: '♊️',
-            CANCER: '♋️',
-            LEO: '♌️',
-            VIRGO: '♍️',
-            LIBRA: '♎️',
-            SCORPIO: '♏️',
-            SAGITTARIUS: '♐️',
-            CAPRICORN: '♑️',
-            AQUARIUS: '♒️',
-            PISCES: '♓️'
-          };
+          
           
           const emoji = zodiacEmojis[horoscope.sign] || '';
           
@@ -304,7 +327,8 @@ class HoroscopeGenerator {
         
         // Add image attachment if any
         if (horoscope.imageUrl) {
-          
+          const signName = ruZodiacSign[horoscope.sign];
+          signsList.push(signName);
           
           attachments.push({
             type: 'photo',
@@ -314,16 +338,16 @@ class HoroscopeGenerator {
         }
       }
       
-      // If we have images but no text (only header/footer), add a minimal text
-      if (params.imageType === 'image') {
-        const Ru_month = monthNames[d.getMonth()];
-        const header = `ГОРОСКОП НА ${day} ${Ru_month} ✨\n`;
-        postText += header;
-      }
       
+      if (params.imageType === 'image') {
+        let resultString = signsList.join(', ');
+        resultString = resultString.charAt(0).toUpperCase() + resultString.slice(1);
+        postText += resultString + '\n';
+      }
       // Add footer if requested
       if (params.addFooter && params.footer) {
         postText += params.footer;
+        
       }
       
       

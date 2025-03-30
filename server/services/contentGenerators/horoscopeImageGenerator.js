@@ -163,7 +163,7 @@ class HoroscopeImageGenerator {
       
       // Calculate and draw text to fill available space
       const fontSize = this.calculateOptimalTextSize(ctx, text, availableHeight);
-      this.drawTextToCenter(ctx, text, fontSize, this.headerHeight, this.footerHeight);
+      this.drawTextToCenter(ctx, text, fontSize, this.headerHeight-20, this.footerHeight);
       
       // Draw footer
       this.drawFooter(ctx, canvas.width, icons);
