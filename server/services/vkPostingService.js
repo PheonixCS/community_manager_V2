@@ -577,7 +577,7 @@ class VkPostingService {
                 const attachmentString = await this.uploadVideoToVKAndGetAttachmentString(
                   videoMedia.s3Url,
                   attachment.video.owner_id.toString(),
-                  vkAccessToken // должен быть доступен в контексте
+                  token
                 );
                 attachmentStrings.push(attachmentString);
                 continue;
