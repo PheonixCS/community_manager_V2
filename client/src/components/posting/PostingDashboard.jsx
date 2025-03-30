@@ -291,7 +291,16 @@ const PostingDashboard = () => {
                 Все
               </Button>
             </Box>
-            <List dense>
+            <List 
+              dense
+              sx={{ 
+                maxHeight: 300, // или любое другое значение, которое вам подходит
+                overflow: 'auto',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1
+              }}
+            >
               {recentHistory.length > 0 ? (
                 recentHistory.map((item, index) => (
                   <React.Fragment key={item._id || index}>
@@ -348,91 +357,108 @@ const PostingDashboard = () => {
                 Все задачи
               </Button>
             </Box>
-            <Grid container spacing={2}>
-              {tasks.length > 0 ? (
-                tasks.map(task => (
-                  <Grid item xs={12} sm={6} md={4} key={task._id}>
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6" component="div" noWrap>
-                          {task.name}
-                        </Typography>
-                        <Box sx={{ mt: 1 }}>
-                          <Chip 
-                            label={task.type === 'schedule' ? 'По расписанию' : 'Разовая'} 
-                            size="small" 
-                            color="primary" 
-                            variant="outlined" 
-                            sx={{ mr: 1 }}
-                          />
-                          <Chip 
-                            label={
-                              task.type === 'schedule' 
-                                ? (task.schedule.active ? 'Активна' : 'Неактивна')
-                                : (task.oneTime.executed ? 'Выполнена' : 'Ожидает')
-                            }
-                            size="small" 
-                            color={
-                              (task.type === 'schedule' && task.schedule.active) || 
-                              (task.type === 'one_time' && !task.oneTime.executed)
-                                ? 'success' 
-                                : 'error'
-                            }
-                            variant="outlined" 
-                          />
-                        </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          Публикаций: {(task.statistics?.successfulPublications || 0) + (task.statistics?.failedPublications || 0)}
-                        </Typography>
-                        {task.type === 'schedule' && task.statistics?.nextExecutionAt && (
-                          <Typography variant="body2" color="text.secondary">
-                            След. запуск: {formatDate(task.statistics.nextExecutionAt)}
+            <Box sx={{ 
+              maxHeight: 500, // или другое значение по вашему усмотрению
+              overflowY: 'auto',
+              pr: 1, // добавляем отступ для скроллбара
+              '&::-webkit-scrollbar': {
+                width: '6px',
+              },
+              '&::-webkit-scrollbar-track': {
+                background: '#f1f1f1',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                background: '#888',
+                borderRadius: '3px',
+              },
+              '&::-webkit-scrollbar-thumb:hover': {
+                background: '#555',
+              }
+            }}>
+              <Grid container spacing={2}>
+                {tasks.length > 0 ? (
+                  tasks.map(task => (
+                    <Grid item xs={12} sm={6} md={4} key={task._id}>
+                      <Card>
+                        <CardContent>
+                          <Typography variant="h6" component="div" noWrap>
+                            {task.name}
                           </Typography>
-                        )}
-                        {task.type === 'one_time' && task.oneTime?.scheduledAt && (
-                          <Typography variant="body2" color="text.secondary">
-                            Запланирован на: {formatDate(task.oneTime.scheduledAt)}
+                          <Box sx={{ mt: 1 }}>
+                            <Chip 
+                              label={task.type === 'schedule' ? 'По расписанию' : 'Разовая'} 
+                              size="small" 
+                              color="primary" 
+                              variant="outlined" 
+                              sx={{ mr: 1 }}
+                            />
+                            <Chip 
+                              label={
+                                task.type === 'schedule' 
+                                  ? (task.schedule.active ? 'Активна' : 'Неактивна')
+                                  : (task.oneTime.executed ? 'Выполнена' : 'Ожидает')
+                              }
+                              size="small" 
+                              color={
+                                (task.type === 'schedule' && task.schedule.active) || 
+                                (task.type === 'one_time' && !task.oneTime.executed)
+                                  ? 'success' 
+                                  : 'error'
+                              }
+                              variant="outlined" 
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Публикаций: {(task.statistics?.successfulPublications || 0) + (task.statistics?.failedPublications || 0)}
                           </Typography>
-                        )}
-                      </CardContent>
-                      <CardActions>
-                        <Button 
-                          size="small"
-                          component={Link}
-                          to={`/posting/tasks/edit/${task._id}`}
-                        >
-                          Подробнее
-                        </Button>
-                        <Button 
-                          size="small"
-                          color="primary"
-                          onClick={() => {
-                            // Logic to execute task immediately
-                            axios.post(`/api/publishing/tasks/${task._id}/execute`)
-                              .then(() => {
-                                // Show success notification if needed
-                                alert('Задача запущена на выполнение');
-                              })
-                              .catch(error => {
-                                console.error('Error executing task:', error);
-                                alert('Ошибка при запуске задачи');
-                              });
-                          }}
-                        >
-                          Выполнить
-                        </Button>
-                      </CardActions>
-                    </Card>
+                          {task.type === 'schedule' && task.statistics?.nextExecutionAt && (
+                            <Typography variant="body2" color="text.secondary">
+                              След. запуск: {formatDate(task.statistics.nextExecutionAt)}
+                            </Typography>
+                          )}
+                          {task.type === 'one_time' && task.oneTime?.scheduledAt && (
+                            <Typography variant="body2" color="text.secondary">
+                              Запланирован на: {formatDate(task.oneTime.scheduledAt)}
+                            </Typography>
+                          )}
+                        </CardContent>
+                        <CardActions>
+                          <Button 
+                            size="small"
+                            component={Link}
+                            to={`/posting/tasks/edit/${task._id}`}
+                          >
+                            Подробнее
+                          </Button>
+                          <Button 
+                            size="small"
+                            color="primary"
+                            onClick={() => {
+                              axios.post(`/api/publishing/tasks/${task._id}/execute`)
+                                .then(() => {
+                                  alert('Задача запущена на выполнение');
+                                })
+                                .catch(error => {
+                                  console.error('Error executing task:', error);
+                                  alert('Ошибка при запуске задачи');
+                                });
+                            }}
+                          >
+                            Выполнить
+                          </Button>
+                        </CardActions>
+                      </Card>
+                    </Grid>
+                  ))
+                ) : (
+                  <Grid item xs={12}>
+                    <Alert severity="info">
+                      Нет активных задач публикации. Создайте новую задачу, чтобы начать публикацию постов.
+                    </Alert>
                   </Grid>
-                ))
-              ) : (
-                <Grid item xs={12}>
-                  <Alert severity="info">
-                    Нет активных задач публикации. Создайте новую задачу, чтобы начать публикацию постов.
-                  </Alert>
-                </Grid>
-              )}
-            </Grid>
+                )}
+              </Grid>
+            </Box>
           </Paper>
         </Grid>
       </Grid>
