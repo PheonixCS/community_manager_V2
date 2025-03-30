@@ -314,18 +314,18 @@ class HoroscopeGenerator {
         }
       }
       
-      
-      // Add footer if requested
-      if (params.addFooter && params.footer) {
-        postText += params.footer;
-      }
-
       // If we have images but no text (only header/footer), add a minimal text
       if (params.imageType === 'image') {
         const Ru_month = monthNames[d.getMonth()];
         const header = `ГОРОСКОП НА ${day} ${Ru_month} ✨\n`;
         postText += header;
       }
+      
+      // Add footer if requested
+      if (params.addFooter && params.footer) {
+        postText += params.footer;
+      }
+      
       
       // Make sure we always include the carouselMode parameter in the result
       // Default to true if it's not explicitly set to false
