@@ -77,7 +77,7 @@ class HoroscopeImageGenerator {
 
     // Layout constants
     this.headerHeight = 150;  // Space reserved for header
-    this.footerHeight = 100;  // Space reserved for footer
+    this.footerHeight = 50;  // Space reserved for footer
     this.horizontalPadding = 90; // Padding from sides
     this.textVerticalPadding = 40; // Padding above and below text
 
