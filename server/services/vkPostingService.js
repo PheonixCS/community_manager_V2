@@ -164,9 +164,9 @@ class VkPostingService {
             }
           }
         }
-        
+        console.log(`Post is carsousel: ${post.isCarousel}, user added media: ${userAddedMedia}`);
         isCarousel = post.isCarousel || userAddedMedia;
-        // console.log`Publishing modified post (isCarousel: ${isCarousel}) to community ${communityId}`);
+        console.log(`Publishing modified post (isCarousel: ${isCarousel}) to community ${communityId}`);
       } else {
         // Передан ID поста - загрузить из базы
         postId = postIdOrData;
@@ -340,7 +340,7 @@ class VkPostingService {
         _photosCount: content.attachments ? content.attachments.filter(a => a.type === 'photo').length : 0,
         ...this.preparePublishOptions(options)
       };
-      console.log(`Post Data:`, postData);
+      // console.log(`Post Data:`, postData);
       // 4. Публикуем пост через VK API с повторными попытками и обновлением токена
       let result;
       let retryCount = 0;
