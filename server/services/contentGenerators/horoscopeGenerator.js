@@ -305,9 +305,7 @@ class HoroscopeGenerator {
         // Add image attachment if any
         if (horoscope.imageUrl) {
           
-          const Ru_month = monthNames[d.getMonth()];
-          const header = `ГОРОСКОП НА ${day} ${Ru_month} ✨\n`;
-          postText += header;
+          
           attachments.push({
             type: 'photo',
             url: horoscope.imageUrl,
@@ -316,14 +314,17 @@ class HoroscopeGenerator {
         }
       }
       
+      
       // Add footer if requested
       if (params.addFooter && params.footer) {
         postText += params.footer;
       }
 
       // If we have images but no text (only header/footer), add a minimal text
-      if (hasImages && !postText.trim() && params.imageType === 'image') {
-        postText = "Гороскоп на завтра";
+      if (params.imageType === 'image') {
+        const Ru_month = monthNames[d.getMonth()];
+        const header = `ГОРОСКОП НА ${day} ${Ru_month} ✨\n`;
+        postText += header;
       }
       
       // Make sure we always include the carouselMode parameter in the result
