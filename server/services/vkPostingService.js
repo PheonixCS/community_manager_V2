@@ -539,31 +539,6 @@ class VkPostingService {
           }
         }
         else if (attachment.type === 'video') {
-          // console.log`Processing video attachment: ${attachment.video?.id || 'unknown'}`);
-          
-          // Определяем лучший источник видео
-          // let videoAttachment = null;
-          
-          // // 1. Сначала проверяем наличие в downloadedVideos (обратная совместимость)
-          // if (hasMediaDownloads) {
-          //   const videoId = attachment.video?.id?.toString();
-          //   // const downloadedVideo = post.hasMediaDownloads.find(v => v.videoId === videoId);
-          //   const downloadedVideo = post.mediaDownloads.find(m => 
-          //     m.type === 'video' && m.mediaId === videoId
-          //   );
-            
-          //   if (downloadedVideo && downloadedVideo.s3Url) {
-          //     // console.log`Found downloaded video in downloadedVideos: ${downloadedVideo.s3Url}`);
-              
-          //     // Используем оригинальное видео из ВК вместо загрузки своего
-          //     if (attachment.video?.owner_id && attachment.video?.id) {
-          //       // console.log`Using original VK video instead of uploading: ${attachment.video.owner_id}_${attachment.video.id}`);
-          //       attachmentStrings.push(`video${attachment.video.owner_id}_${attachment.video.id}`);
-          //       continue;
-          //     }
-          //   }
-          // }
-          
           // 2. Затем проверяем mediaDownloads (новый формат)
           if (hasMediaDownloads) {
             const videoId = attachment.video?.id?.toString();
@@ -574,11 +549,13 @@ class VkPostingService {
             if (videoMedia && videoMedia.s3Url) {
               // console.log`Found downloaded video in mediaDownloads: ${videoMedia.s3Url}`);
               try {
+                console.log(`params: ${videoMedia.s3Url}, ${attachment.video.owner_id}, ${token}`);
                 const attachmentString = await this.uploadVideoToVKAndGetAttachmentString(
                   videoMedia.s3Url,
                   attachment.video.owner_id.toString(),
                   token
                 );
+                console.log(`attachmentString: ${attachmentString}`);
                 attachmentStrings.push(attachmentString);
                 continue;
               }
