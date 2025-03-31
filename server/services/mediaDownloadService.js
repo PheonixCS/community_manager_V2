@@ -335,7 +335,8 @@ class MediaDownloadService {
         if (successfulS3Keys.length > 0) {
           for (const key of successfulS3Keys) {
             try {
-              await s3Service.deleteObject(key);
+              // Use deleteFile instead of deleteObject
+              await s3Service.deleteFile(key);
               console.log(`Deleted S3 object with key: ${key}`);
             } catch (s3DeleteError) {
               console.error(`Failed to delete S3 object with key ${key}:`, s3DeleteError);
