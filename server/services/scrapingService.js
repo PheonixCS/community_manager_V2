@@ -248,7 +248,7 @@ class ScrapingService {
         });
         
         // Обновляем пост после скачивания медиа
-        // return await Post.findById(savedPost._id);
+        return await Post.findById(savedPost._id);
       }
       return {
         post: savedPost,
