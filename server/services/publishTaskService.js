@@ -423,7 +423,11 @@ class PublishTaskService {
     if (!text) return text;
     
     // Удаляем хештеги в формате #слово
-    return text.replace(/#[\wа-яА-ЯёЁ]+/g, '').replace(/\s+/g, ' ').trim();
+    let result = text.replace(/#[\wа-яА-ЯёЁ]+/g, '');
+    // Заменяем множественные пробелы на один, но сохраняем переносы строк
+    result = result.replace(/[^\S\n]+/g, ' ');
+    // Удаляем пробелы в начале и конце строк, но сохраняем переносы
+    return result.trim();
   }
 
   /**
