@@ -64,19 +64,28 @@ class ScrapingService {
           
           // 6. Сохранение отфильтрованных постов
           for (const post of filteredPosts) {
-            // Сохраняем пост и получаем информацию о том, новый он или обновленный
-            const result = await this.savePost(post, task, community);
-            
-            // Инкрементируем счетчики на основе результата
-            if (result.isNew) {
-              newPostsCount++;
-              // console.log(`New post ${post.id} added`);
-            } else {
-              updatedPostsCount++;
-              // console.log(`Existing post ${post.id} updated`);
+            try {
+              // Сохраняем пост и получаем информацию о том, новый он или обновленный
+              const result = await this.savePost(post, task, community);
+              
+              // Проверяем, что результат существует и содержит информацию о посте
+              // (результат может быть null, если пост был удален из-за ошибки скачивания видео)
+              if (result) {
+                // Инкрементируем счетчики на основе результата
+                if (result.isNew) {
+                  newPostsCount++;
+                  // console.log(`New post ${post.id} added`);
+                } else {
+                  updatedPostsCount++;
+                  // console.log(`Existing post ${post.id} updated`);
+                }
+                
+                totalProcessedPosts++;
+              }
+            } catch (error) {
+              console.error(`Error processing post ${post.id}:`, error);
+              // Продолжаем с другими постами
             }
-            
-            totalProcessedPosts++;
           }
           
           // console.log(`Saved ${filteredPosts.length} posts from community ${community.name}`);
@@ -235,7 +244,7 @@ class ScrapingService {
           postId: post.id
         };
         
-        await mediaDownloadService.processPostMedia(postForMediaDownload, {
+        const mediaResult = await mediaDownloadService.processPostMedia(postForMediaDownload, {
           downloadMedia: {
             enabled: true,
             types: {
@@ -247,9 +256,26 @@ class ScrapingService {
           }
         });
         
+        // Проверяем результат скачивания медиа
+        if (mediaResult.status === 'failed') {
+          // Если скачивание медиа не удалось, пост уже был удален в mediaDownloadService
+          console.log(`Post ${post.id} was deleted due to media download failure`);
+          return null; // Возвращаем null, чтобы указать, что пост был удален
+        }
+        
         // Обновляем пост после скачивания медиа
-        return await Post.findById(savedPost._id);
+        const updatedPost = await Post.findById(savedPost._id);
+        if (!updatedPost) {
+          // Пост был удален в процессе скачивания медиа
+          return null;
+        }
+        
+        return {
+          post: updatedPost,
+          isNew: true // Этот пост был создан
+        };
       }
+      
       return {
         post: savedPost,
         isNew: true // Этот пост был создан
