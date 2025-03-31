@@ -205,7 +205,7 @@ class MediaDownloadService {
 
       ytdlpProcess.stdout.on('data', (data) => {
         stdoutData += data.toString();
-        // console.log(`yt-dlp stdout: ${data}`);
+        console.log(`yt-dlp stdout: ${data}`);
       });
 
       ytdlpProcess.stderr.on('data', (data) => {
@@ -251,6 +251,8 @@ class MediaDownloadService {
     
     const results = [];
     const mediaDownloads = [];
+    let hasVideoFailure = false;
+    const successfulS3Keys = []; // Track successful uploads to clean up if needed
     
     // Обрабатываем все вложения в посте
     for (const attachment of post.attachments) {
@@ -268,6 +270,10 @@ class MediaDownloadService {
             break;
           case 'video':
             downloadResult = await this.downloadVideo(attachment.video, post.communityId, post.postId);
+            // Check if video download failed
+            if (!downloadResult.success) {
+              hasVideoFailure = true;
+            }
             break;
           case 'doc':
             downloadResult = await this.downloadDocument(attachment.doc, post.communityId, post.postId);
@@ -287,6 +293,11 @@ class MediaDownloadService {
         });
         
         if (downloadResult && downloadResult.success) {
+          // Track successful S3 upload for potential cleanup
+          if (downloadResult.s3?.key) {
+            successfulS3Keys.push(downloadResult.s3.key);
+          }
+          
           mediaDownloads.push({
             type: attachment.type,
             mediaId: attachment[attachment.type]?.id?.toString(),
@@ -297,12 +308,54 @@ class MediaDownloadService {
         }
       } catch (error) {
         console.error(`Error processing ${attachment.type}:`, error);
+        if (attachment.type === 'video') {
+          hasVideoFailure = true;
+        }
         results.push({
           type: attachment.type,
           id: attachment[attachment.type]?.id,
           success: false,
           error: error.message
         });
+      }
+    }
+    
+    // If video download failed, delete post and clean up S3
+    if (hasVideoFailure) {
+      console.log('Video download failed, cleaning up post and S3 resources');
+      try {
+        // Delete post from database if it exists
+        if (post._id) {
+          const Post = require('../models/Post');
+          await Post.findByIdAndDelete(post._id);
+          console.log(`Post with ID ${post._id} deleted due to video download failure`);
+        }
+        
+        // Clean up successful S3 uploads
+        if (successfulS3Keys.length > 0) {
+          for (const key of successfulS3Keys) {
+            try {
+              await s3Service.deleteObject(key);
+              console.log(`Deleted S3 object with key: ${key}`);
+            } catch (s3DeleteError) {
+              console.error(`Failed to delete S3 object with key ${key}:`, s3DeleteError);
+            }
+          }
+        }
+        
+        return {
+          status: 'failed',
+          error: 'Video download failed, post and associated media have been deleted',
+          results
+        };
+      } catch (cleanupError) {
+        console.error('Error during cleanup after video download failure:', cleanupError);
+        return {
+          status: 'error',
+          error: 'Video download failed and cleanup operation encountered errors',
+          cleanupError: cleanupError.message,
+          results
+        };
       }
     }
     
