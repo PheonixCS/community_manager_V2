@@ -201,65 +201,79 @@ class VkPostingService {
           postText = postText.split('').map(char => translitMap[char] || char).join('');
         }
       }
-      
-      // 1. Получаем токен публикации
-      const token = await this.getPublishToken();
-      if (!token) {
-        throw new Error('Failed to get publish token. Authorize VK user first.');
-      }
-      
-      // 3. Подготавливаем данные для публикации
-      const postData = {
-        owner_id: communityId, // ID сообщества со знаком минус
-        message: postText,
-        // Добавляем attachments, если есть
-        attachments: await this.prepareAttachments(attachments, token, communityId, post),
-        // Добавляем внутренние метаданные для использования в makeWallPostRequest
-        _post: post,
-        _isCarousel: isCarousel,
-        _photosCount: attachments ? attachments.filter(a => a.type === 'photo').length : 0,
-        _mediaAdded: userAddedMedia,
-        // Применяем опции публикации
-        ...this.preparePublishOptions(options)
-      };
-      
-      // 4. Публикуем пост через VK API
-      const result = await this.makeWallPostRequest(postData, token);
-      
-      // 5. Если опция pinned установлена, закрепляем пост
-      if (options.pinned) {
+      // Публикуем пост через VK API с повторными попытками
+      const maxRetries = 6;
+      const retryDelay = 10 * 60 * 1000; // 10 минут в миллисекундах
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          await this.pinPost(result.post_id, communityId, token);
-        } catch (pinError) {
-          console.error(`Error pinning post ${result.post_id}:`, pinError);
-          // Не прерываем процесс, если закрепление не удалось
-        }
-      }
-      
-      // 6. Обновляем информацию о посте в базе данных только если пост был из БД
-      // (идентифицируем это наличием метода save)
-      if (postId) {
-        // Получаем оригинальный пост из базы если нам передали объект с модификациями
-        if (typeof postIdOrData === 'object' && originalPostId) {
-          post = await Post.findById(originalPostId);
-          if (!post) {
-            console.warn(`Original post with ID ${originalPostId} not found for updating`);
+          // 1. Получаем токен публикации
+          const token = await this.getPublishToken();
+          if (!token) {
+            throw new Error('Failed to get publish token. Authorize VK user first.');
           }
+          
+          // 3. Подготавливаем данные для публикации
+          const postData = {
+            owner_id: communityId, // ID сообщества со знаком минус
+            message: postText,
+            // Добавляем attachments, если есть
+            attachments: await this.prepareAttachments(attachments, token, communityId, post),
+            // Добавляем внутренние метаданные для использования в makeWallPostRequest
+            _post: post,
+            _isCarousel: isCarousel,
+            _photosCount: attachments ? attachments.filter(a => a.type === 'photo').length : 0,
+            _mediaAdded: userAddedMedia,
+            // Применяем опции публикации
+            ...this.preparePublishOptions(options)
+          };
+          
+          // 4. Публикуем пост через VK API
+          const result = await this.makeWallPostRequest(postData, token);
+          
+          // 5. Если опция pinned установлена, закрепляем пост
+          if (options.pinned) {
+            try {
+              await this.pinPost(result.post_id, communityId, token);
+            } catch (pinError) {
+              console.error(`Error pinning post ${result.post_id}:`, pinError);
+              // Не прерываем процесс, если закрепление не удалось
+            }
+          }
+       
+          // 6. Обновляем информацию о посте в базе данных только если пост был из БД
+          // (идентифицируем это наличием метода save)
+          if (postId) {
+            // Получаем оригинальный пост из базы если нам передали объект с модификациями
+            if (typeof postIdOrData === 'object' && originalPostId) {
+              post = await Post.findById(originalPostId);
+              if (!post) {
+                console.warn(`Original post with ID ${originalPostId} not found for updating`);
+              }
+            }
+            
+            // Обновляем информацию только если нашли пост в БД
+            if (post && typeof post.save === 'function') {
+              await this.updatePostAfterPublish(post, result, communityId);
+            }
+          }
+          
+          return {
+            status: 'success',
+            postId: result.post_id,
+            message: `Post successfully published to VK community ${communityId}`,
+            vkUrl: `https://vk.com/wall${communityId}_${result.post_id}`
+          };
         }
-        
-        // Обновляем информацию только если нашли пост в БД
-        if (post && typeof post.save === 'function') {
-          await this.updatePostAfterPublish(post, result, communityId);
+        catch (error) {
+          console.error(`Error publishing post (attempt ${attempt + 1}/${maxRetries}):`, error);
+          // Если это последняя попытка, выбрасываем ошибку
+          if (attempt === maxRetries - 1) {
+            throw new Error(`Failed to publish post after ${maxRetries} attempts: ${error.message}`);
+          }
+          // Ждем перед следующей попыткой
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
-      
-      return {
-        status: 'success',
-        postId: result.post_id,
-        message: `Post successfully published to VK community ${communityId}`,
-        vkUrl: `https://vk.com/wall${communityId}_${result.post_id}`
-      };
-      
     } catch (error) {
       console.error('Error publishing post:', error);
       return {
@@ -943,6 +957,10 @@ class VkPostingService {
           }
           
           throw new Error(`${errorMsg} Ошибка API: ${response.data.error.error_msg}`);
+        }
+        //Advertisement post was recently added тогда нужно повторить постинг спустя 10 минут, до 6 раз.
+        if (response.data.error.error_code === 219) {
+          throw response.data.error;
         }
         
         throw new Error(`VK API Error: ${response.data.error.error_msg}`);

@@ -376,39 +376,42 @@ class PublishTaskService {
             }
             
           } catch (error) {
-            console.error(`Error publishing post ${post._id} to group ${targetGroup.groupId}:`, error);
-            
-            // Добавляем дополнительное сообщение, если ошибка связана с отсутствием токена
-            let errorMessage = error.message;
-            if (error.message.includes('токен') || error.message.includes('авторизоваться')) {
-              errorMessage += ' Перейдите в раздел "Авторизация ВКонтакте" для добавления токена.';
+            if (error.data && error.data.error && error.data.error.error_code === 219) {
+                await publishTaskRepository.savePublishHistory({
+                  sourcePostId: post.postId,
+                  postId: post._id,
+                  sourceGroupId: post.communityId,
+                  targetGroupId: targetGroup.groupId,
+                  publishedAt: new Date(),
+                  publishTaskId: task._id,
+                  status: 'failed',
+                  targetPostId: 'failed_publish', // Add this to prevent validation errors
+                  errorMessage: `Failed to publish post after 6/6 attempts: ${error.message}`
+                });
+                result.failed++;
+                continue;
+            } else {   
+                await publishTaskRepository.savePublishHistory({
+                  sourcePostId: post.postId,
+                  postId: post._id,
+                  sourceGroupId: post.communityId,
+                  targetGroupId: targetGroup.groupId,
+                  publishedAt: new Date(),
+                  publishTaskId: task._id,
+                  status: 'failed',
+                  targetPostId: 'failed_publish', // Add this to prevent validation errors
+                  errorMessage: error.message || 'Unknown error'
+                });
+                result.failed++;
+                continue;
             }
-            
-            // Save error information (with error handling)
-            try {
-              await publishTaskRepository.savePublishHistory({
-                sourcePostId: post.postId || 'unknown',
-                postId: post._id,
-                sourceGroupId: post.communityId || 'unknown',
-                targetGroupId: targetGroup.groupId,
-                publishedAt: new Date(),
-                publishTaskId: task._id,
-                status: 'failed',
-                targetPostId: 'error', // Add this to prevent validation errors
-                errorMessage: errorMessage
-              });
-            } catch (historyError) {
-              console.error('Failed to save error history:', historyError);
-            }
-            
-            result.failed++;
           }
         }
       }
       return result;
     } catch (tokenCheckError) {
       console.error('Error checking tokens:', tokenCheckError);
-      result.failed += task.targetGroups.length;
+      return result;
     }
     
     
@@ -642,10 +645,8 @@ class PublishTaskService {
       // Подготавливаем данные для обновления
       const updateData = { ...taskData };
       
-      // Если меняется cron-выражение, рассчитываем новое время следующего запуска
-      if (updateData.type === 'schedule' && 
-          updateData.schedule?.cronExpression &&
-          updateData.schedule.cronExpression !== currentTask.schedule?.cronExpression) {
+      // Всегда обновляем время следующего выполнения.
+      if (updateData.type === 'schedule') {
         
         const nextExecutionTime = await publishTaskRepository.calculateNextExecutionTime(
           updateData.schedule.cronExpression
