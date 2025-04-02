@@ -170,78 +170,48 @@ class PublishTaskRepository extends BaseRepository {
       
       console.log(`Found ${publishedPostIds.length} posts already published in target group ${targetGroupId}`);
       
-      // 2. Строим запрос с исключением опубликованных в это сообщество постов
-      const query = {
-        taskId: { $in: scrapingTaskIds },
-        viewRate: { $gte: minViewRate }
-      };
-      
-      // Исключаем посты, которые уже были опубликованы в это сообщество
-      if (publishedPostIds.length > 0) {
-        query._id = { $nin: publishedPostIds };
+      let posts = [];
+      let excludedPostIds = new Set(publishedPostIds); // Используем Set для быстрого поиска
+
+      while (posts.length < limit) {
+        // Формируем запрос
+        const query = {
+          taskId: { $in: scrapingTaskIds },
+          viewRate: { $gte: minViewRate },
+          _id: { $nin: Array.from(excludedPostIds) } // Исключаем уже исключенные посты
+        };
+
+        // Получаем неопубликованные в это сообщество посты, отсортированные по рейтингу
+        const fetchedPosts = await Post.find(query)
+          .sort({ viewRate: -1 })
+          .limit(limit - posts.length); // Ограничиваем количество запрашиваемых постов
+
+        // Проверяем, какие посты соответствуют условиям
+        const validPosts = fetchedPosts.filter(post => {
+          const downloadedPhotosCount = post.mediaDownloads.filter(media => media.type === 'photo').length;
+          const downloadedVideosCount = post.mediaDownloads.filter(media => media.type === 'video').length;
+          const attachedPhotosCount = post.attachments.filter(attachment => attachment.type === 'photo').length;
+          const attachedVideosCount = post.attachments.filter(attachment => attachment.type === 'video').length;
+          console.log(`Post ${post._id}: downloadedPhotosCount=${downloadedPhotosCount}, attachedPhotosCount=${attachedPhotosCount}, downloadedVideosCount=${downloadedVideosCount}, attachedVideosCount=${attachedVideosCount}`);
+          return downloadedPhotosCount === attachedPhotosCount && downloadedVideosCount === attachedVideosCount;
+        });
+
+        // Добавляем валидные посты в общий массив
+        posts = posts.concat(validPosts);
+
+        // Если валидных постов меньше, чем нужно, добавляем их ID в исключения
+        if (validPosts.length < limit - posts.length) {
+          fetchedPosts.forEach(post => excludedPostIds.add(post._id));
+        }
+
+        // Если больше нет постов для обработки, выходим из цикла
+        if (fetchedPosts.length === 0) {
+          break;
+        }
       }
-      
-      // 3. Получаем неопубликованные в это сообщество посты, отсортированные по рейтингу
-      const posts = await Post.aggregate([
-        { $match: query },
-        {
-          $project: {
-            _id: 1,
-            viewRate: 1,
-            mediaDownloads: 1,
-            attachments: 1,
-            downloadedPhotosCount: {
-              $size: {
-                $filter: {
-                  input: "$mediaDownloads",
-                  as: "media",
-                  cond: { $eq: ["$media.type", "photo"] }
-                }
-              }
-            },
-            downloadedVideosCount: {
-              $size: {
-                $filter: {
-                  input: "$mediaDownloads",
-                  as: "media",
-                  cond: { $eq: ["$media.type", "video"] }
-                }
-              }
-            },
-            attachedPhotosCount: {
-              $size: {
-                $filter: {
-                  input: "$attachments",
-                  as: "attachment",
-                  cond: { $eq: ["$attachment.type", "photo"] }
-                }
-              }
-            },
-            attachedVideosCount: {
-              $size: {
-                $filter: {
-                  input: "$attachments",
-                  as: "attachment",
-                  cond: { $eq: ["$attachment.type", "video"] }
-                }
-              }
-            }
-          }
-        },
-        {
-          $match: {
-            $expr: {
-              $and: [
-                { $eq: ["$downloadedPhotosCount", "$attachedPhotosCount"] },
-                { $eq: ["$downloadedVideosCount", "$attachedVideosCount"] }
-              ]
-            }
-          }
-        },
-        { $sort: { viewRate: -1 } },
-        { $limit: limit }
-      ]);
-      
+
+// Теперь у вас есть массив posts с нужными постами
+
       console.log(`Found ${posts.length} unpublished posts for target group ${targetGroupId}`);
       
       return posts;
