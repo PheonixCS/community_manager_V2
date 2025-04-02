@@ -182,9 +182,65 @@ class PublishTaskRepository extends BaseRepository {
       }
       
       // 3. Получаем неопубликованные в это сообщество посты, отсортированные по рейтингу
-      const posts = await Post.find(query)
-        .sort({ viewRate: -1 })
-        .limit(limit);
+      const posts = await Post.aggregate([
+        { $match: query },
+        {
+          $project: {
+            _id: 1,
+            viewRate: 1,
+            mediaDownloads: 1,
+            attachments: 1,
+            downloadedPhotosCount: {
+              $size: {
+                $filter: {
+                  input: "$mediaDownloads",
+                  as: "media",
+                  cond: { $eq: ["$media.type", "photo"] }
+                }
+              }
+            },
+            downloadedVideosCount: {
+              $size: {
+                $filter: {
+                  input: "$mediaDownloads",
+                  as: "media",
+                  cond: { $eq: ["$media.type", "video"] }
+                }
+              }
+            },
+            attachedPhotosCount: {
+              $size: {
+                $filter: {
+                  input: "$attachments",
+                  as: "attachment",
+                  cond: { $eq: ["$attachment.type", "photo"] }
+                }
+              }
+            },
+            attachedVideosCount: {
+              $size: {
+                $filter: {
+                  input: "$attachments",
+                  as: "attachment",
+                  cond: { $eq: ["$attachment.type", "video"] }
+                }
+              }
+            }
+          }
+        },
+        {
+          $match: {
+            $expr: {
+              $and: [
+                { $eq: ["$downloadedPhotosCount", "$attachedPhotosCount"] },
+                { $eq: ["$downloadedVideosCount", "$attachedVideosCount"] }
+              ]
+            }
+          }
+        },
+        { $sort: { viewRate: -1 } },
+        { $limit: limit }
+      ]);
       
       console.log(`Found ${posts.length} unpublished posts for target group ${targetGroupId}`);
       
