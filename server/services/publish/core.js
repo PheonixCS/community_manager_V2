@@ -10,7 +10,7 @@ function sleep(ms) {
  * @param {number} counter - Счетчик попыток получения токенов (по умолчанию 0)
  */
 async function getActiveTokens(counter) {
-    let counter = counter || 0;
+    counter = counter || 0;
     const maxRetries = 5; // Максимальное количество попыток
     try {
         const tokens = await vkAuthService.getTokens();
