@@ -234,7 +234,7 @@ class PublishTaskService {
         }
         for (const post of bestPosts) {
           try {
-            console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens?.length || 'unknown'} active tokens`);
+            console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeToken?.length || 'unknown'} active tokens`);
             
             // Создаем копию поста для модификации
             let modifiedPost = { ...post.toObject() };
