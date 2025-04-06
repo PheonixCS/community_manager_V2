@@ -4,7 +4,7 @@ const contentGeneratorService = require('./contentGeneratorService');
 const Post = require('../models/Post');
 const cron = require('node-cron');
 const parser = require('cron-parser');
-import { getActiveTokens, preparePost } from './publish/core';
+const { getActiveTokens, preparePost} = require('./publish/core');
 /**
  * Сервис для управления задачами публикации в ВК
  */

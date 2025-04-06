@@ -5,7 +5,7 @@ const vkApiService = require('./vkApiService');
 const vkAuthService = require('./vkAuthService');
 const { postRepository } = require('../repositories');
 const config = require('../config/config');
-import { getActiveTokens } from './publish/core';
+const { getActiveTokens } = require('./publish/core');
 // Add the missing VK API version constant
 const vkApiVersion = config.vk.apiVersion || '5.131';
 
