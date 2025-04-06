@@ -238,7 +238,7 @@ class PublishTaskService {
             
             // Создаем копию поста для модификации
             let modifiedPost = { ...post.toObject() };
-            modifiedPost = preparePost(modifiedPost, task.publishOptions, task.postCustomization);
+            modifiedPost = await preparePost(modifiedPost, task.publishOptions, task.postCustomization);
             
             // Публикуем пост в целевую группу, передавая модифицированный пост напрямую
             const publishResult = await vkPostingService.publishExistingPost(
