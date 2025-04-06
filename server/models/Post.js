@@ -105,8 +105,9 @@ PostSchema.methods.calculateViewRate = function() {
   const publishedAt = new Date(this.date);
   const currentTime = new Date();
   const secondsElapsed = Math.max(1, Math.floor((currentTime - publishedAt) / 1000)); // Защита от деления на ноль
+  const hoursElapsed = Math.floor(secondsElapsed / 3600); // Часы с момента публикации
   
-  return parseFloat((this.views / secondsElapsed).toFixed(6)); // 6 знаков после запятой
+  return parseFloat((this.views / hoursElapsed).toFixed(6)); // 6 знаков после запятой
 };
 
 module.exports = mongoose.model('Post', PostSchema);

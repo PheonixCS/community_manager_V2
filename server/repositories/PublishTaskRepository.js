@@ -174,11 +174,16 @@ class PublishTaskRepository extends BaseRepository {
       let excludedPostIds = new Set(publishedPostIds); // Используем Set для быстрого поиска
 
       while (posts.length < limit) {
+        const currentTime = new Date();
+        const oneHourAgo = new Date(currentTime.getTime() - 60 * 60 * 1000); // Текущее время минус 1 час
+        const tenMinutesAgo = new Date(currentTime.getTime() - 10 * 60 * 1000); // Текущее время минус 10 минут
         // Формируем запрос
         const query = {
           taskId: { $in: scrapingTaskIds },
           viewRate: { $gte: minViewRate },
-          _id: { $nin: Array.from(excludedPostIds) } // Исключаем уже исключенные посты
+          _id: { $nin: Array.from(excludedPostIds) },
+          date: { $lte: oneHourAgo }, // date старше текущего времени минимум на час
+          lastUpdated: { $lte: tenMinutesAgo } // lastUpdated старше текущего времени минимум на 10 минут
         };
 
         // Получаем неопубликованные в это сообщество посты, отсортированные по рейтингу
