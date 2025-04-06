@@ -4,7 +4,7 @@ const contentGeneratorService = require('./contentGeneratorService');
 const Post = require('../models/Post');
 const cron = require('node-cron');
 const parser = require('cron-parser');
-
+import { getActiveTokens, preparePost } from './publish/core';
 /**
  * Сервис для управления задачами публикации в ВК
  */
@@ -126,13 +126,7 @@ class PublishTaskService {
     };
     
     // Если задача использует генератор контента
-    if (task.useContentGenerator && task.contentGeneratorSettings?.generatorId) {
-      // console.log('Task settings:', JSON.stringify(task.contentGeneratorSettings, null, 2));
-      // Подробный вывод параметров генерации для отладки
-      // if (task.contentGeneratorSettings?.params) {
-      //   console.log('Generator params details:', task.contentGeneratorSettings.params);
-      // }
-      
+    if (task.useContentGenerator && task.contentGeneratorSettings?.generatorId) {  
       // Удаляем return, который блокирует выполнение
       result = await this.executeGeneratorTask(task, result);
       if (result) {
@@ -175,43 +169,9 @@ class PublishTaskService {
       return;
     }
     
-    // // Находим лучшие посты для публикации
-    // const bestPosts = await publishTaskRepository.findBestPostsForPublishing(
-    //   scrapingTaskIds,
-    //   task.postsPerExecution || 1,
-    //   task.minViewRate || 0
-    // );
-    
-    // console.log(`Found ${bestPosts.length} best posts for publishing`);
-    
-    // if (bestPosts.length === 0) {
-    //   console.log('No suitable posts found for publishing');
-    //   // Save this fact in history for better reporting
-    //   try {
-    //     await publishTaskRepository.savePublishHistory({
-    //       sourcePostId: 'no_posts',
-    //       postId: null,
-    //       sourceGroupId: 'n/a',
-    //       targetGroupId: task.targetGroups.length > 0 ? task.targetGroups[0].groupId : 'no_target',
-    //       publishedAt: new Date(),
-    //       publishTaskId: task._id,
-    //       status: 'failed',
-    //       targetPostId: 'no_suitable_posts',
-    //       errorMessage: 'Не найдены подходящие посты для публикации'
-    //     });
-    //     result.failed += task.targetGroups.length;
-    //   } catch (historyError) {
-    //     console.error('Failed to save no-posts history:', historyError);
-    //     result.failed += task.targetGroups.length;
-    //   }
-    //   return result;
-    // }
-    
     // Check tokens before attempting to publish to avoid multiple failures
     try {
-      const vkAuthService = require('./vkAuthService');
-      const tokens = await vkAuthService.getAllTokens();
-      const activeTokens = tokens.filter(t => t.isActive && !t.isExpired());
+      const activeTokens = await getActiveTokens();
       
       if (activeTokens.length === 0) {
         const errorMessage = 'Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".';
@@ -277,63 +237,8 @@ class PublishTaskService {
             console.log(`Attempting to publish post ${post._id} to group ${targetGroup.groupId} using one of ${activeTokens?.length || 'unknown'} active tokens`);
             
             // Создаем копию поста для модификации
-            const modifiedPost = { ...post.toObject() };
-            
-            // ВАЖНО: сначала применяем базовые трансформации текста согласно настройкам publishOptions,
-            // затем применяем настройки кастомизации, которые добавляют контент
-            
-            // Применяем трансформации текста согласно настройкам задачи публикации
-            if (task.publishOptions.removeHashtags && modifiedPost.text) {
-              modifiedPost.text = this.removeHashtags(modifiedPost.text);
-            }
-            
-            // Применяем транслитерацию, если включена
-            if (task.publishOptions.transliterate && modifiedPost.text) {
-              modifiedPost.text = this.transliterateText(modifiedPost.text);
-            }
-            
-            // После базовых трансформаций применяем настройки кастомизации поста
-            if (task.postCustomization) {
-              // Добавляем текст в начало или конец поста
-              if (task.postCustomization.addText?.enabled && task.postCustomization.addText?.text) {
-                if (task.postCustomization.addText.position === 'before') {
-                  modifiedPost.text = `${task.postCustomization.addText.text}\n\n${modifiedPost.text || ''}`;
-                } else {
-                  modifiedPost.text = `${modifiedPost.text || ''}\n\n${task.postCustomization.addText.text}`;
-                }
-              }
-              
-              // Добавляем хэштеги в конец поста
-              if (task.postCustomization.addHashtags?.enabled && task.postCustomization.addHashtags?.hashtags) {
-                const hashtags = task.postCustomization.addHashtags.hashtags
-                  .split(/[\s,]+/)
-                  .filter(tag => tag.length > 0)
-                  .map(tag => tag.startsWith('#') ? tag : `#${tag}`)
-                  .join(' ');
-                
-                modifiedPost.text = `${modifiedPost.text || ''}\n\n${hashtags}`;
-              }
-              
-              // Добавляем ссылку на источник
-              if (task.postCustomization.addSourceLink?.enabled && post.postUrl) {
-                const sourcePrefix = task.postCustomization.addSourceLink.text || 'Источник: ';
-                modifiedPost.text = `${modifiedPost.text || ''}\n\n${sourcePrefix}${post.postUrl}`;
-              }
-              
-              // Добавляем подпись в конец поста
-              if (task.postCustomization.addSignature?.enabled && task.postCustomization.addSignature?.text) {
-                modifiedPost.text = `${modifiedPost.text || ''}\n\n${task.postCustomization.addSignature.text}`;
-              }
-              
-              // Добавляем изображение, если указано
-              if (task.postCustomization.addImage?.enabled && task.postCustomization.addImage?.imageUrl) {
-                modifiedPost.attachments = modifiedPost.attachments || [];
-                modifiedPost.attachments.push({
-                  type: 'photo',
-                  url: task.postCustomization.addImage.imageUrl
-                });
-              }
-            }
+            let modifiedPost = { ...post.toObject() };
+            modifiedPost = preparePost(modifiedPost, task.publishOptions, task.postCustomization);
             
             // Публикуем пост в целевую группу, передавая модифицированный пост напрямую
             const publishResult = await vkPostingService.publishExistingPost(
