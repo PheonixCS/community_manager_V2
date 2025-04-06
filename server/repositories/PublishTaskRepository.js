@@ -163,10 +163,10 @@ class PublishTaskRepository extends BaseRepository {
       const publishedHistory = await PublishHistory.find({
         status: 'success',
         targetGroupId: targetGroupId
-      }).select('postId');
+      }).select('sourcePostId');
       
       // Извлекаем ID опубликованных постов
-      const publishedPostIds = publishedHistory.map(h => h.postId);
+      const publishedPostIds = publishedHistory.map(h => h.sourcePostId);
       
       console.log(`Found ${publishedPostIds.length} posts already published in target group ${targetGroupId}`);
       
@@ -181,7 +181,7 @@ class PublishTaskRepository extends BaseRepository {
         const query = {
           taskId: { $in: scrapingTaskIds },
           viewRate: { $gte: minViewRate },
-          _id: { $nin: Array.from(excludedPostIds) },
+          sourcePostId: { $nin: Array.from(excludedPostIds) }, // Изменено на sourcePostId
           date: { $lte: oneHourAgo }, // date старше текущего времени минимум на час
           lastUpdated: { $gte: tenMinutesAgo } // lastUpdated старше текущего времени минимум на 10 минут
         };
