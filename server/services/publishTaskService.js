@@ -4,7 +4,7 @@ const contentGeneratorService = require('./contentGeneratorService');
 const Post = require('../models/Post');
 const cron = require('node-cron');
 const parser = require('cron-parser');
-const { getActiveTokens, preparePost} = require('./publish/core');
+const { getActiveToken, preparePost} = require('./publish/core');
 /**
  * Сервис для управления задачами публикации в ВК
  */
@@ -171,9 +171,9 @@ class PublishTaskService {
     
     // Check tokens before attempting to publish to avoid multiple failures
     try {
-      const activeTokens = await getActiveTokens();
+      const activeToken = await getActiveToken();
       
-      if (activeTokens.length === 0) {
+      if (activeToken == null) {
         const errorMessage = 'Нет активных токенов ВКонтакте. Необходимо авторизоваться в разделе "Авторизация ВКонтакте".';
         console.error(errorMessage);
         

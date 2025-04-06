@@ -5,7 +5,7 @@ const vkApiService = require('./vkApiService');
 const vkAuthService = require('./vkAuthService');
 const { postRepository } = require('../repositories');
 const config = require('../config/config');
-const { getActiveTokens } = require('./publish/core');
+const { getActiveToken } = require('./publish/core');
 // Add the missing VK API version constant
 const vkApiVersion = config.vk.apiVersion || '5.131';
 
@@ -203,11 +203,11 @@ class VkPostingService {
       }
 
       // 1. Получаем токен публикации
-      const tokens = await getActiveTokens(0);
-      if (tokens.length === 0) {
+      const tokens = await getActiveToken(0);
+      if (tokens == null) {
         throw new Error('Failed to get publish token. Authorize VK user first.');
       }
-      const token = tokens[0].accessToken;
+      const token = tokens.accessToken;
       // 3. Подготавливаем данные для публикации
       const postData = {
         owner_id: communityId, // ID сообщества со знаком минус

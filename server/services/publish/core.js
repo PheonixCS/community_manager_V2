@@ -9,26 +9,26 @@ function sleep(ms) {
  * @description Получает активные токены из сервиса авторизации ВК
  * @param {number} counter - Счетчик попыток получения токенов (по умолчанию 0)
  */
-async function getActiveTokens(counter) {
+async function getActiveToken(counter) {
     counter = counter || 0;
     const maxRetries = 5; // Максимальное количество попыток
     try {
-        const tokens = await vkAuthService.getTokens();
-        if (activeTokens.length === 0) {
+        const activeToken = await vkAuthService.getActiveToken();
+        if (!activeToken || activeToken == null) {
             console.log(`No active tokens found. Retrying ${counter}/${maxRetries} ...`);
             if (counter >= maxRetries) {
                 console.error('Max retries reached. Exiting...');
-                return [];
+                return null;
             }
             sleep(60000); // Ждем 1 минуту перед повторной попыткой
             getActiveTokens(counter + 1); // Повторяем попытку
         }
-        console.log(`Found ${tokens.length} active tokens`);
-        return tokens;
+        console.log(`Found ${activeToken}`);
+        return activeToken;
     }
     catch (error) {
         console.error('Error fetching active tokens:', error);
-        return [];
+        return null;
     }
 }
 
@@ -134,6 +134,6 @@ function transliterateText(text) {
 }
 
 module.exports = {
-    getActiveTokens,
+    getActiveToken,
     preparePost
 };
