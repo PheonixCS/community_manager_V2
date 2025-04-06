@@ -106,6 +106,9 @@ PostSchema.methods.calculateViewRate = function() {
   const currentTime = new Date();
   const secondsElapsed = Math.max(1, Math.floor((currentTime - publishedAt) / 1000)); // Защита от деления на ноль
   const hoursElapsed = Math.floor(secondsElapsed / 3600); // Часы с момента публикации
+  if (hoursElapsed === 0) {
+    return 0; // Если пост опубликован менее часа назад, возвращаем количество просмотров
+  }
   
   return parseFloat((this.views / hoursElapsed).toFixed(6)); // 6 знаков после запятой
 };
