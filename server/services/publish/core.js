@@ -21,7 +21,7 @@ async function getActiveToken(counter) {
                 return null;
             }
             sleep(60000); // Ждем 1 минуту перед повторной попыткой
-            getActiveTokens(counter + 1); // Повторяем попытку
+            getActiveToken(counter + 1); // Повторяем попытку
         }
         console.log(`Found ${activeToken}`);
         return activeToken;
