@@ -203,7 +203,7 @@ const TopRatedPosts = () => {
                       <TableCell>
                         <Chip 
                           icon={<TrendingUpIcon />}
-                          label={post.viewRate.toFixed(6)}
+                          label={post.viewRate? post.viewRate.toFixed(6) : 0}
                           color="primary"
                         />
                       </TableCell>
