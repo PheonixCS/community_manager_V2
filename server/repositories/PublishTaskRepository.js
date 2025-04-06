@@ -190,6 +190,12 @@ class PublishTaskRepository extends BaseRepository {
         const fetchedPosts = await Post.find(query)
           .sort({ viewRate: -1 })
           .limit(limit - posts.length); // Ограничиваем количество запрашиваемых постов
+        
+        // Логируем запрос к базе данных
+        console.log(`Querying posts: ${JSON.stringify(query)}`);
+        // Логируем ответ базы данных
+        console.log(`Fetched ${fetchedPosts.length} posts from the database`);
+
 
         // Проверяем, какие посты соответствуют условиям
         const validPosts = fetchedPosts.filter(post => {
