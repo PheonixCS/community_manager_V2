@@ -183,7 +183,7 @@ class PublishTaskRepository extends BaseRepository {
           viewRate: { $gte: minViewRate },
           _id: { $nin: Array.from(excludedPostIds) },
           date: { $lte: oneHourAgo }, // date старше текущего времени минимум на час
-          lastUpdated: { $lte: tenMinutesAgo } // lastUpdated старше текущего времени минимум на 10 минут
+          lastUpdated: { $gte: tenMinutesAgo } // lastUpdated старше текущего времени минимум на 10 минут
         };
 
         // Получаем неопубликованные в это сообщество посты, отсортированные по рейтингу
