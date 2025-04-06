@@ -350,15 +350,11 @@ class VkPostingService {
             // console.log`Attempt ${retryCount}/${maxRetries}: Getting fresh token from database`);
             
             // Получаем свежий токен через vkAuthService
-            const vkAuthService = require('./vkAuthService');
-            const tokens = await vkAuthService.getAllTokens();
-            const activeTokens = tokens.filter(t => t.isActive && !t.isExpired());
-            
-            if (activeTokens.length === 0) {
-              throw new Error('No active tokens available after refresh');
+            const tokens = await getActiveToken(0);
+            if (tokens == null) {
+              throw new Error('Failed to get publish token. Authorize VK user first.');
             }
-            
-            token = activeTokens[0].accessToken;
+            token = tokens.accessToken;
             // console.log`Using fresh token for retry attempt ${retryCount}`);
           }
           
@@ -871,7 +867,7 @@ class VkPostingService {
    * @param {string} token - Токен публикации
    * @returns {Promise<Object>} Результат публикации
    */
-  async makeWallPostRequest(postData, token) {
+  async makeWallPostRequest(postData, token, counter = 0) {
     try {
       // console.log('Attempting wall.post request with data:', {
       //   owner_id: postData.owner_id,
@@ -963,7 +959,19 @@ class VkPostingService {
       if (error.message.includes('Access denied') || 
           error.message.includes('permission') || 
           error.message.includes('access')) {
-        throw new Error('Недостаточно прав для публикации. Пожалуйста, удалите текущий токен и выполните авторизацию ВКонтакте заново, предоставив все запрашиваемые разрешения (особенно "Управление сообществом" и "Доступ к стене").');
+            if (counter >= 3) {
+              throw new Error('Недостаточно прав для публикации. Пожалуйста, удалите текущий токен и выполните авторизацию ВКонтакте заново, предоставив все запрашиваемые разрешения (особенно "Управление сообществом" и "Доступ к стене").');
+            }
+            const tokens = await getActiveToken(0);
+            if (tokens == null) {
+              throw new Error('Failed to get publish token. Authorize VK user first.');
+            }
+            token = tokens.accessToken;
+            
+            await this.makeWallPostRequest(postData, token, counter + 1);
+
+
+        
       }
       
       throw error;
