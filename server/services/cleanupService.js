@@ -149,100 +149,104 @@ class CleanupService {
     console.log('Starting cleanup process...');
     
     try {
-      // Get current settings
-      const settings = await this.getSettings();
+      // // Get current settings
+      // const settings = await this.getSettings();
       
-      // Build query based on rules
-      const query = {};
-      const rules = settings.rules;
+      // // Build query based on rules
+      // const query = {};
+      // const rules = settings.rules;
       
-      // Rule: Posts older than X hours
-      if (rules.olderThan && rules.olderThan.enabled) {
-        const olderThanDate = new Date();
-        olderThanDate.setHours(olderThanDate.getHours() - rules.olderThan.hours);
-        query.date = { $lt: olderThanDate };
-      }
+      // // Rule: Posts older than X hours
+      // if (rules.olderThan && rules.olderThan.enabled) {
+      //   const olderThanDate = new Date();
+      //   olderThanDate.setHours(olderThanDate.getHours() - rules.olderThan.hours);
+      //   query.date = { $lt: olderThanDate };
+      // }
       
-      // Rule: Posts with low view rate
-      if (rules.lowViewRate && rules.lowViewRate.enabled) {
-        query.viewRate = { $lt: rules.lowViewRate.threshold };
-      }
+      // // Rule: Posts with low view rate
+      // if (rules.lowViewRate && rules.lowViewRate.enabled) {
+      //   query.viewRate = { $lt: rules.lowViewRate.threshold };
+      // }
       
-      // Rule: Posts with low engagement
-      if (rules.lowEngagement && rules.lowEngagement.enabled) {
-        if (rules.lowEngagement.minLikes > 0) {
-          query.likes = { $lt: rules.lowEngagement.minLikes };
-        }
-        if (rules.lowEngagement.minComments > 0) {
-          query.comments = { $lt: rules.lowEngagement.minComments };
-        }
-        if (rules.lowEngagement.minReposts > 0) {
-          query.reposts = { $lt: rules.lowEngagement.minReposts };
-        }
-      }
+      // // Rule: Posts with low engagement
+      // if (rules.lowEngagement && rules.lowEngagement.enabled) {
+      //   if (rules.lowEngagement.minLikes > 0) {
+      //     query.likes = { $lt: rules.lowEngagement.minLikes };
+      //   }
+      //   if (rules.lowEngagement.minComments > 0) {
+      //     query.comments = { $lt: rules.lowEngagement.minComments };
+      //   }
+      //   if (rules.lowEngagement.minReposts > 0) {
+      //     query.reposts = { $lt: rules.lowEngagement.minReposts };
+      //   }
+      // }
       
-      // Rule: Posts from specific communities
-      if (rules.specificCommunities && rules.specificCommunities.enabled && 
-          rules.specificCommunities.communities.length > 0) {
+      // // Rule: Posts from specific communities
+      // if (rules.specificCommunities && rules.specificCommunities.enabled && 
+      //     rules.specificCommunities.communities.length > 0) {
         
-        if (rules.specificCommunities.exclude) {
-          // Exclude these communities
-          query.communityId = { $nin: rules.specificCommunities.communities };
-        } else {
-          // Only include these communities
-          query.communityId = { $in: rules.specificCommunities.communities };
-        }
-      }
+      //   if (rules.specificCommunities.exclude) {
+      //     // Exclude these communities
+      //     query.communityId = { $nin: rules.specificCommunities.communities };
+      //   } else {
+      //     // Only include these communities
+      //     query.communityId = { $in: rules.specificCommunities.communities };
+      //   }
+      // }
       
-      // Additional handling for duplicate media (more complex query)
-      let postsToDelete = [];
-      // логируем какие правила для удаления используются
-      console.log('Applying rules:', JSON.stringify(rules, null, 2));
-      // Find all posts that match our query
-      postsToDelete = await Post.find(query).select('_id');
+      // // Additional handling for duplicate media (more complex query)
+      // let postsToDelete = [];
+      // // логируем какие правила для удаления используются
+      // console.log('Applying rules:', JSON.stringify(rules, null, 2));
+      // // Find all posts that match our query
+      // postsToDelete = await Post.find(query).select('_id');
       
-      // Special handling for duplicate media if enabled
-      if (rules.duplicateMedia && rules.duplicateMedia.enabled) {
-        const mediaDuplicates = await this.findDuplicateMediaPosts();
+      // // Special handling for duplicate media if enabled
+      // if (rules.duplicateMedia && rules.duplicateMedia.enabled) {
+      //   const mediaDuplicates = await this.findDuplicateMediaPosts();
         
-        // Get IDs from media duplicates
-        const duplicateIds = mediaDuplicates.map(post => post._id.toString());
+      //   // Get IDs from media duplicates
+      //   const duplicateIds = mediaDuplicates.map(post => post._id.toString());
         
-        // Only add new IDs not already in postsToDelete
-        const existingIds = new Set(postsToDelete.map(post => post._id.toString()));
-        for (const id of duplicateIds) {
-          if (!existingIds.has(id)) {
-            postsToDelete.push({ _id: mongoose.Types.ObjectId(id) });
-          }
-        }
-      }
+      //   // Only add new IDs not already in postsToDelete
+      //   const existingIds = new Set(postsToDelete.map(post => post._id.toString()));
+      //   for (const id of duplicateIds) {
+      //     if (!existingIds.has(id)) {
+      //       postsToDelete.push({ _id: mongoose.Types.ObjectId(id) });
+      //     }
+      //   }
+      // }
       
-      // Delete posts
-      let deletedCount = 0;
-      console.log(`Found ${postsToDelete.length} posts to delete`);
+      // // Delete posts
+      // let deletedCount = 0;
+      // console.log(`Found ${postsToDelete.length} posts to delete`);
       
-      // Delete posts in batches
-      for (const postDoc of postsToDelete) {
-        try {
-          await postService.deletePost(postDoc._id);
-          deletedCount++;
-        } catch (error) {
-          console.error(`Error deleting post ${postDoc._id}:`, error);
-        }
-      }
-      await postService.cleanupOrphanedMedia();
+      // // Delete posts in batches
+      // for (const postDoc of postsToDelete) {
+      //   try {
+      //     await postService.deletePost(postDoc._id);
+      //     deletedCount++;
+      //   } catch (error) {
+      //     console.error(`Error deleting post ${postDoc._id}:`, error);
+      //   }
+      // }
+      // await postService.cleanupOrphanedMedia();
       
+      
+      
+      
+      let result = await postService.deleteAllPosts();
       // Update statistics
       const duration = Date.now() - startTime;
       settings.statistics.lastRun = new Date();
       settings.statistics.totalCleanups += 1;
-      settings.statistics.totalPostsDeleted += deletedCount;
-      settings.statistics.lastCleanupPostsDeleted = deletedCount;
+      settings.statistics.totalPostsDeleted += result.deletedPosts;
+      settings.statistics.lastCleanupPostsDeleted = result.deletedPosts;
       
       // Add to history
       settings.statistics.history.push({
         date: new Date(),
-        postsDeleted: deletedCount,
+        postsDeleted: result.deletedPosts,
         duration
       });
       
@@ -253,8 +257,8 @@ class CleanupService {
       
       await settings.save();
       
-      console.log(`Cleanup process completed. Deleted ${deletedCount} posts in ${duration}ms`);
-      
+      console.log(`Cleanup process completed. Deleted ${result.deletedPosts} posts in ${duration}ms`);
+      let deletedCount = result.deletedPosts;
       return {
         deletedCount,
         duration,
