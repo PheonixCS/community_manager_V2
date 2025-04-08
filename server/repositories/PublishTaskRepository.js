@@ -181,7 +181,7 @@ class PublishTaskRepository extends BaseRepository {
         const query = {
           taskId: { $in: scrapingTaskIds },
           viewRate: { $gte: minViewRate },
-          sourcePostId: { $nin: Array.from(excludedPostIds) }, // Изменено на sourcePostId
+          postId: { $nin: Array.from(excludedPostIds) }, // Изменено на sourcePostId
           date: { $lte: oneHourAgo }, // date старше текущего времени минимум на час
           lastUpdated: { $gte: tenMinutesAgo } // lastUpdated старше текущего времени минимум на 10 минут
         };
