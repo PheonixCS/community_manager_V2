@@ -235,7 +235,7 @@ class CleanupService {
       
       
       
-      let result = await postService.deleteAllPosts();
+      const result = await postService.deleteAllPosts();
       const settings = await this.getSettings();
       // Update statistics
       const duration = Date.now() - startTime;
