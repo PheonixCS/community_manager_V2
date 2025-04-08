@@ -150,7 +150,7 @@ class CleanupService {
     
     try {
       // // Get current settings
-      // const settings = await this.getSettings();
+      // 
       
       // // Build query based on rules
       // const query = {};
@@ -236,6 +236,7 @@ class CleanupService {
       
       
       let result = await postService.deleteAllPosts();
+      const settings = await this.getSettings();
       // Update statistics
       const duration = Date.now() - startTime;
       settings.statistics.lastRun = new Date();
